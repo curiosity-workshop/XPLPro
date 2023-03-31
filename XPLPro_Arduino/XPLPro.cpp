@@ -15,7 +15,7 @@ XPLPro::XPLPro(Stream* device)
 	streamPtr->setTimeout(XPL_RX_TIMEOUT);
 }
 
-void XPLPro::begin(char * devicename, void *initFunction, void *stopFunction)
+void XPLPro::begin(char * devicename, void *initFunction, void *stopFunction, void *inboundHandler)
 {
 		
 	_deviceName = devicename;
@@ -25,6 +25,7 @@ void XPLPro::begin(char * devicename, void *initFunction, void *stopFunction)
 		
 	_xplInitFunction = initFunction;
 	_xplStopFunction = stopFunction;
+	_xplInboundHandler = inboundHandler;
 }
 
 
@@ -32,6 +33,9 @@ void XPLPro::begin(char * devicename, void *initFunction, void *stopFunction)
 int XPLPro::xloop(void)
 {
 	_processSerial();
+	if (_registerFlag) _xplInitFunction();				// handle registrations
+	_registerFlag = 0;
+
 	return _connectionStatus;
 }
 
@@ -115,29 +119,32 @@ void XPLPro::datarefRead(int handle, float * value)
 
 	
 }
+*/
 
+void XPLPro::datarefWrite(int handle, int value)
+{
+	_sendPacketInt(XPLCMD_DATAREFUPDATE, handle, value);
+}
 
 void XPLPro::datarefWrite(int handle, long int value)
 {
-	//if (_dataRefs[handle]->dataRefHandle >= 0 && (_dataRefs[handle]->dataRefRWType == XPL_WRITE || _dataRefs[handle]->dataRefRWType == XPL_READWRITE))
-	//	*(long int *)_dataRefs[handle]->latestValue = value;
-
+	_sendPacketInt(XPLCMD_DATAREFUPDATE, handle, value);
 }
 
 void XPLPro::datarefWrite(int handle, float value)
 {
-	//if (_dataRefs[handle]->dataRefHandle >= 0 && (_dataRefs[handle]->dataRefRWType == XPL_READ || _dataRefs[handle]->dataRefRWType == XPL_READWRITE))
-//		*(float*)_dataRefs[handle]->latestValue = value;
+	_sendPacketFloat(XPLCMD_DATAREFUPDATE, handle, value);
+
 }
 
-*/
+
 
 void XPLPro::_sendname()
 {
 	if (_deviceName != NULL)
 	{
 		_sendPacketString(XPLRESPONSE_NAME, _deviceName);
-		_registerFlag = 1;
+		
 	}
 		
 	//_xplInitFunction();						// Call the init function since we know xplane and the plugin are up and running
@@ -185,7 +192,11 @@ void XPLPro::_processSerial()
 
 void XPLPro::_processPacket()
 {
- 
+//	char tStr[80];				// remove for distrubution
+	
+//	lcd.setCursor(0, 1);
+//	lcd.print(_receiveBuffer);
+	
 	if (_receiveBuffer[0] != XPL_PACKETHEADER) return;
 
 	switch (_receiveBuffer[1])
@@ -203,27 +214,26 @@ void XPLPro::_processPacket()
 		
 			_sendname();
 			_connectionStatus = true;			//not considered active till you know my name
-
+			_registerFlag = 0;	
 			break;
 		
 
 		case XPLCMD_SENDREQUEST :
-			_xplInitFunction();						// plugin is ready for registrations
-
+			_registerFlag = 1;				// plugin is ready for registrations.  Use a flag so recursion doesn't occur
+			
 			break;
 
 		case XPLRESPONSE_DATAREF :
 		   
 			_parseInt(&_handleAssignment, _receiveBuffer, 2);
-
-			sendDebugMessage("dataref response received");
+		//	sprintf(tStr, "dr response rx: %i", _handleAssignment);
+	//		sendDebugMessage(tStr);
 			break;
 		
 
 		case XPLRESPONSE_COMMAND:
 		
 			_parseInt(&_handleAssignment, _receiveBuffer, 2);
-			sendDebugMessage("command response received");
 			break;
 		
 
@@ -236,8 +246,6 @@ void XPLPro::_processPacket()
 		
 		
 		case XPLREQUEST_REFRESH:
-		
-
 			break;
 		
 
@@ -253,14 +261,24 @@ void XPLPro::_processPacket()
 	_receiveBuffer[0] = 0;
 }
 
+void XPLPro::_sendPacketInt(int command, int handle, int value)			// for ints
+{
+	if (handle < 0) return;
+
+
+	sprintf(_sendBuffer, "%c%c,%i,%i%c", XPL_PACKETHEADER, command, handle, value, XPL_PACKETTRAILER);
+
+	_transmitPacket();
+
+}
 
 void XPLPro::_sendPacketInt(int command, int handle, long int value)			// for ints
 {
 	if (handle < 0) return;
 
-	//sprintf(_sendBuffer, "%c%c%3.3i%07.7i%c", XPLDIRECT_PACKETHEADER, command, handle, value, XPLDIRECT_PACKETTRAILER);
-	sprintf(_sendBuffer, "%c%c,%3.3i,%ld%c", XPL_PACKETHEADER, command, handle, value, XPL_PACKETTRAILER);
-//streamPtr->print("building packet: ");  streamPtr->println(_sendBuffer);
+	
+	sprintf(_sendBuffer, "%c%c,%i,%ld%c", XPL_PACKETHEADER, command, handle, value, XPL_PACKETTRAILER);
+
 	_transmitPacket();
 
 }
@@ -270,7 +288,7 @@ void XPLPro::_sendPacketFloat(int command, int handle, float value)		// for floa
 	if (handle < 0) return;
 // some boards cant do sprintf with floats so this is a workaround.  What a pain.  Implementing 2 decimals of precision for now.
 	//sprintf(_sendBuffer, "%c%c%3.3i%07i.%02i%c", 
-	  sprintf(_sendBuffer, "%c%c%3.3i0%i.%3.3i%c",					// change to reduce data flow 01/26/2021 MG
+	  sprintf(_sendBuffer, "%c%c,%i0%i.%i%c",					// change to reduce data flow 01/26/2021 MG
 																	// fix problem with leading zeros 03/01/2022
 		XPL_PACKETHEADER, 
 		command, 
@@ -303,7 +321,7 @@ void XPLPro::_sendPacketVoid(int command, int handle)			// just a command with a
 {
 	if (handle < 0) return;
 
-	sprintf(_sendBuffer, "%c%c%3.3i%c", XPL_PACKETHEADER, command, handle, XPL_PACKETTRAILER);
+	sprintf(_sendBuffer, "%c%c,%i%c", XPL_PACKETHEADER, command, handle, XPL_PACKETTRAILER);
   
   _transmitPacket();
 }
@@ -443,37 +461,40 @@ int XPLPro::_getPayloadFromFrame(char* value)			// Assuming receive buffer is ho
 
 */
 
+/*
 #ifdef XPL_USE_PROGMEM
-int XPLPro::registerDataRef(const __FlashStringHelper* datarefName, int rwmode)
+int XPLPro::registerDataRef(const __FlashStringHelper* datarefName)
 {
 	return -1;
 }
 #endif
+*/
 
-int XPLPro::registerDataRef(const char* datarefName, int rwmode)
+int XPLPro::registerDataRef(const char* datarefName)
 {
 	long int startTime;
 
 	
+	if (!_registerFlag) return -1;
 
-	sprintf(_sendBuffer, "%c%c,\"%s\", %i%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERDATAREF, datarefName, rwmode, XPL_PACKETTRAILER);
+	sprintf(_sendBuffer, "%c%c,\"%s\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERDATAREF, datarefName, XPL_PACKETTRAILER);
 	_transmitPacket();
 
 	_handleAssignment = -1;
 	startTime = millis();					// for timeout function
 	
-	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment<0)
+	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment<0 )
 		_processSerial();
 		
-	if (_handleAssignment < 0) sendDebugMessage("registerDataRef timed out"); else	sendDebugMessage("registerDataRef successful");
-	
+	//if (millis() - startTime > XPL_RESPONSE_TIMEOUT) sendDebugMessage("dr timed out...");
+
 	return _handleAssignment;
 	
 
 	
 }
 
-
+/*
 
 #ifdef XPL_USE_PROGMEM
 int XPLPro::registerCommand(const __FlashStringHelper* commandName)		// user will trigger commands with commandTrigger
@@ -483,6 +504,7 @@ int XPLPro::registerCommand(const __FlashStringHelper* commandName)		// user wil
 	
 }
 #endif
+*/
 
 int XPLPro::registerCommand(const char* commandName)		// user will trigger commands with commandTrigger
 {
@@ -494,9 +516,9 @@ int XPLPro::registerCommand(const char* commandName)		// user will trigger comma
 	sprintf(_sendBuffer, "%c%c,\"%s\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERCOMMAND, commandName, XPL_PACKETTRAILER);
 	_transmitPacket();
 
-	_handleAssignment = false;
+	_handleAssignment = -1;
 
-	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && !_handleAssignment)
+	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment<0)
 		_processSerial();
 
 	return _handleAssignment;
