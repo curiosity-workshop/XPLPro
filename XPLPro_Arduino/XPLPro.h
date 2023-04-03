@@ -14,8 +14,11 @@
 #ifndef XPLPro_h
 #define XPLPro_h
 
+#define XPL_FLOATPRECISION      2                   // how many decimals of precision for floating point datarefs.  More increases dataflow (default 2)
+
 #define XPL_RX_TIMEOUT          500               // after detecting a frame header, how long will we wait to receive the rest of the frame.  (default 500 ms)
-#define XPL_RESPONSE_TIMEOUT    60000              // after sending a registration request, how long will we wait for the response.  (default 2000 ms)  
+#define XPL_RESPONSE_TIMEOUT    60000              // after sending a registration request, how long will we wait for the response.  
+                                                    // this is giant because sometimes xplane says the plane is loaded then does other stuff for a while. (default 60000 ms)  
 
 #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) || defined (__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)        // add to this for boards that need it
     #define XPL_USE_PROGMEM                                 // define this for boards with limited memory that can use PROGMEM to store strings.  
@@ -49,16 +52,21 @@
 #define XPLRESPONSE_COMMAND        'C'          // Plugin responds with handle to command or - value if not found.  command handle, command name
 #define XPLRESPONSE_VERSION        'v'          // Arduino responds with build version number if requested
 #define XPLCMD_PRINTDEBUG          'g'          // plugin logs string sent from arduino
-#define XPLCMD_RESET               '2'
+#define XPLCMD_RESET               '3'
 #define XPLCMD_SPEAK               's'          // plugin speaks string through xplane speech 
 #define XPLCMD_SENDNAME            'N'          // plugin request name from arduino
 #define XPLREQUEST_REGISTERDATAREF 'b'   // 
 #define XPLREQUEST_REGISTERCOMMAND 'm'  // just the name of the command to register
 #define XPLREQUEST_NOREQUESTS      'c'   // nothing to request
 #define XPLREQUEST_REFRESH         'd'	//  the plugin will call this once xplane is loaded in order to get fresh updates from arduino handles that write
+#define XPLREQUEST_UPDATES         'r'          // arduino is asking the plugin to update the specified dataref with rate and divider parameters
+#define XPLREQUEST_UPDATESARRAY     't'
 
-#define XPLCMD_DATAREFUPDATE       'u'
-#define XPLCMD_SENDREQUEST         'f'          // plugin sends this when it is ready to register bindings
+#define XPLCMD_DATAREFUPDATEINT       '1'
+#define XPLCMD_DATAREFUPDATEFLOAT       '2'
+#define XPLCMD_DATAREFUPDATESTRING	'3'
+
+#define XPLCMD_SENDREQUEST         'Q'          // plugin sends this when it is ready to register bindings
 //#define XPLCMD_DEVICEREADY         'g'
 //#define XPLCMD_DEVICENOTREADY      'h'
 #define XPLCMD_COMMANDSTART         'i'
@@ -88,8 +96,18 @@ class XPLPro
     int commandEnd(int commandHandle);
   
     void datarefWrite(int handle, int value);
-    void datarefWrite(int handle, long int value);                                               // write directly to variable
+    void datarefWrite(int handle, int value, int arrayElement);
+
+    void datarefWrite(int handle, long int value);       
+    void datarefWrite(int handle, long int value, int arrayElement);
+    
     void datarefWrite(int handle, float value);
+    void datarefWrite(int handle, float value, int arrayElement);
+
+    void requestUpdates(int handle, int rate, float divider);
+    void requestUpdates(int handle, int rate, float divider, int element);
+    
+    
    // void datarefRead(int handle, long int *value);
    // void datarefRead(int handle, float *value);
 
@@ -109,23 +127,27 @@ class XPLPro
     void sendResetRequest(void);
     int xloop(void);                                                                            // where the magic happens!
   
-    
+    int readValueInt;
+    long readValueLong;
+    float readValueFloat;
+
+
   private:
       void _processSerial();
       void _processPacket();
 
-      void _sendPacketInt(int command, int handle, int value);
-      void _sendPacketInt(int command, int handle, long int value);         // for ints
-      void _sendPacketFloat(int command, int handle, float value);       // for floats
-      void _sendPacketVoid(int command, int handle);                    // just a command with a handle
-      void _sendPacketString(int command, const char* str);                     // send a string
+    
    
       void _transmitPacket();
 
-      void _sendname();
+      void _sendname();  
+
+      void _sendPacketVoid(int command, int handle);                    // just a command with a handle
+      void _sendPacketString(int command, const char* str);                     // send a string
      
       
       int _parseInt(int* outTarget, char* inBuffer, int parameter);
+      int _parseFloat(float* outTarget, char* inBuffer, int parameter);
       int _parseString(char* outBuffer, char* inBuffer, int parameter, int maxSize);
           
       Stream* streamPtr;

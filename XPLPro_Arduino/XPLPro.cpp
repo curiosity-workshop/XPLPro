@@ -47,8 +47,10 @@ int XPLPro::commandTrigger(int commandHandle)
 
 int XPLPro::commandTrigger(int commandHandle, int triggerCount)
 {
-	_sendPacketInt(XPLCMD_COMMANDTRIGGER, commandHandle, (long int)triggerCount);
-
+	if (commandHandle < 0) return;
+	sprintf(_sendBuffer, "%c%c,%i,%i,%c", XPL_PACKETHEADER, XPLCMD_COMMANDTRIGGER, commandHandle, triggerCount, XPL_PACKETTRAILER);
+	_transmitPacket();
+	
 	return 0;
 }
 
@@ -121,22 +123,79 @@ void XPLPro::datarefRead(int handle, float * value)
 }
 */
 
+// these could be done better:
+
 void XPLPro::datarefWrite(int handle, int value)
 {
-	_sendPacketInt(XPLCMD_DATAREFUPDATE, handle, value);
+	if (handle < 0) return;
+	sprintf(_sendBuffer, "%c%c,%i,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, XPL_PACKETTRAILER);
+	_transmitPacket();
+	
+}
+
+void XPLPro::datarefWrite(int handle, int value, int arrayElement)
+{
+	if (handle < 0) return;
+	sprintf(_sendBuffer, "%c%c,%i,%i,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, arrayElement, XPL_PACKETTRAILER);
+	_transmitPacket();
+
 }
 
 void XPLPro::datarefWrite(int handle, long int value)
 {
-	_sendPacketInt(XPLCMD_DATAREFUPDATE, handle, value);
+
+	if (handle < 0) return;
+	sprintf(_sendBuffer, "%c%c,%i,%ld%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, XPL_PACKETTRAILER);
+	_transmitPacket();
+
+
+}
+
+void XPLPro::datarefWrite(int handle, long int value, int arrayElement)
+{
+
+	if (handle < 0) return;
+	sprintf(_sendBuffer, "%c%c,%i,%ld,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, arrayElement, XPL_PACKETTRAILER);
+	_transmitPacket();
+
 }
 
 void XPLPro::datarefWrite(int handle, float value)
 {
-	_sendPacketFloat(XPLCMD_DATAREFUPDATE, handle, value);
+	if (handle < 0) return;
+
+	char tBuf[20];				//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
+		dtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
+
+		sprintf(_sendBuffer, "%c%c,%i,%s%c",
+			XPL_PACKETHEADER,
+			XPLCMD_DATAREFUPDATEFLOAT,
+			handle,
+			tBuf,
+			XPL_PACKETTRAILER);
+	
+	_transmitPacket();
 
 }
 
+void XPLPro::datarefWrite(int handle, float value, int arrayElement)
+{
+	if (handle < 0) return;
+	
+	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
+		dtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
+
+		sprintf(_sendBuffer, "%c%c,%i,%s,%i%c",
+			XPL_PACKETHEADER,
+			XPLCMD_DATAREFUPDATEFLOAT,
+			handle,
+			tBuf,
+			arrayElement,
+			XPL_PACKETTRAILER);
+
+	_transmitPacket();
+
+}
 
 
 void XPLPro::_sendname()
@@ -192,10 +251,7 @@ void XPLPro::_processSerial()
 
 void XPLPro::_processPacket()
 {
-//	char tStr[80];				// remove for distrubution
-	
-//	lcd.setCursor(0, 1);
-//	lcd.print(_receiveBuffer);
+	int tHandle;
 	
 	if (_receiveBuffer[0] != XPL_PACKETHEADER) return;
 
@@ -238,12 +294,19 @@ void XPLPro::_processPacket()
 		
 
 		
-		case XPLCMD_DATAREFUPDATE :
+		case XPLCMD_DATAREFUPDATEINT :
 		
-			//int refhandle = _getHandleFromFrame();
-						
+			_parseInt(&tHandle, _receiveBuffer, 2);
+			_parseInt(&readValueInt, _receiveBuffer, 3);
+			_xplInboundHandler(tHandle);
 			break;
-		
+
+		case XPLCMD_DATAREFUPDATEFLOAT:
+
+			_parseInt(&tHandle, _receiveBuffer, 2);
+			_parseFloat(&readValueFloat, _receiveBuffer, 3);
+			_xplInboundHandler(tHandle);
+			break;
 		
 		case XPLREQUEST_REFRESH:
 			break;
@@ -261,61 +324,6 @@ void XPLPro::_processPacket()
 	_receiveBuffer[0] = 0;
 }
 
-void XPLPro::_sendPacketInt(int command, int handle, int value)			// for ints
-{
-	if (handle < 0) return;
-
-
-	sprintf(_sendBuffer, "%c%c,%i,%i%c", XPL_PACKETHEADER, command, handle, value, XPL_PACKETTRAILER);
-
-	_transmitPacket();
-
-}
-
-void XPLPro::_sendPacketInt(int command, int handle, long int value)			// for ints
-{
-	if (handle < 0) return;
-
-	
-	sprintf(_sendBuffer, "%c%c,%i,%ld%c", XPL_PACKETHEADER, command, handle, value, XPL_PACKETTRAILER);
-
-	_transmitPacket();
-
-}
-
-void XPLPro::_sendPacketFloat(int command, int handle, float value)		// for floats
-{
-	if (handle < 0) return;
-// some boards cant do sprintf with floats so this is a workaround.  What a pain.  Implementing 2 decimals of precision for now.
-	//sprintf(_sendBuffer, "%c%c%3.3i%07i.%02i%c", 
-	  sprintf(_sendBuffer, "%c%c,%i0%i.%i%c",					// change to reduce data flow 01/26/2021 MG
-																	// fix problem with leading zeros 03/01/2022
-		XPL_PACKETHEADER, 
-		command, 
-		handle, 
-		abs((int)value), 
-		abs((int)(value * 1000) % 1000), 
-		XPL_PACKETTRAILER);
-
-	if (value < 0) _sendBuffer[5] = '-';
-/*	
-Alternate method perhaps
-
-char tBuf[20];
-	dtostrf(value, 0, 2, tBuf);
-
-	sprintf(_sendBuffer, "%c%c%3.3i%s%c",
-		XPLDIRECT_PACKETHEADER,
-		command,
-		handle,
-		buff,
-		XPLDIRECT_PACKETTRAILER);
-
-		
-*/
-	_transmitPacket();
-	
-}
 
 void XPLPro::_sendPacketVoid(int command, int handle)			// just a command with a handle
 {
@@ -393,73 +401,41 @@ int XPLPro::_parseInt(int* outTarget, char* inBuffer, int parameter)
 	char holdChar = inBuffer[pos];
 	inBuffer[pos] = 0;
 	*outTarget = atoi((char*)&inBuffer[cBeg]);
+		
+	inBuffer[pos] = holdChar;
 
-	//	fprintf(errlog, "outTarget: %i cBeg: %i pos: %i string: %s\n", *outTarget, cBeg, pos, (char*)&inBuffer[cBeg]);
+	return 0;
+
+}
+int XPLPro::_parseFloat(float* outTarget, char* inBuffer, int parameter)
+{
+	int cBeg;
+	int pos = 0;
+
+	for (int i = 1; i < parameter; i++)
+	{
+
+		while (inBuffer[pos] != ',' && inBuffer[pos] != NULL) pos++;
+		pos++;
+
+	}
+	cBeg = pos;
+
+	while (inBuffer[pos] != ',' && inBuffer[pos] != NULL && inBuffer[pos] != XPL_PACKETTRAILER) pos++;
+
+	char holdChar = inBuffer[pos];
+	inBuffer[pos] = 0;
+	*outTarget = atof((char*)&inBuffer[cBeg]);
 
 	inBuffer[pos] = holdChar;
 
-
-
 	return 0;
 
 }
 
 
-/*
-int XPLPro::_getHandleFromFrame()			// Assuming receive buffer is holding a good frame
-{
-	char holdChar;
-	int handleRet;
 
-	holdChar = _receiveBuffer[5];
-	_receiveBuffer[5] = 0;
-	handleRet = atoi((char*)&_receiveBuffer[2]);
-	
-	_receiveBuffer[5] = holdChar;
-	return handleRet;
 
-}
-
-int XPLPro::_getPayloadFromFrame(long int *value)			// Assuming receive buffer is holding a good frame
-{
-	char holdChar;
-	
-	holdChar = _receiveBuffer[15];
-	_receiveBuffer[15] = 0;
-	*value = atol((char*)&_receiveBuffer[5]);
-	
-	_receiveBuffer[15] = holdChar;
-
-	return 0;
-
-}
-
-int XPLPro::_getPayloadFromFrame(float *value)			// Assuming receive buffer is holding a good frame
-{
-	char holdChar;
-	
-	holdChar = _receiveBuffer[15];
-	_receiveBuffer[15] = 0;
-	*value = atof((char*)&_receiveBuffer[5]);
-
-	_receiveBuffer[15] = holdChar;
-	return 0;
-
-}
-
-int XPLPro::_getPayloadFromFrame(char* value)			// Assuming receive buffer is holding a good frame
-{
-	
-	memcpy(value, (char*)&_receiveBuffer[5], _receiveBufferBytesReceived -6);
-	value[_receiveBufferBytesReceived -6] = 0;							// erase the packet trailer
-	for (int i = 0; i < _receiveBufferBytesReceived - 6; i++)
-		if (value[i] == 7) value[i] = XPL_PACKETTRAILER;			//  How I deal with the possibility of the packet trailer being within a string
-	//streamPtr->println(value);
-	return 0;
-
-}
-
-*/
 
 /*
 #ifdef XPL_USE_PROGMEM
@@ -527,3 +503,35 @@ int XPLPro::registerCommand(const char* commandName)		// user will trigger comma
 	
 }
 
+void XPLPro::requestUpdates(int handle, int rate, float divider)
+{
+	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
+	dtostrf(divider, 0, XPL_FLOATPRECISION, tBuf);
+
+	sprintf(_sendBuffer, "%c%c,%i,%i,%s%c",
+		XPL_PACKETHEADER,
+		XPLREQUEST_UPDATES,
+		handle,
+		rate,
+		tBuf,
+		XPL_PACKETTRAILER);
+
+	_transmitPacket();
+}
+
+void XPLPro::requestUpdates(int handle, int rate, float divider, int element)
+{
+	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
+	dtostrf(divider, 0, XPL_FLOATPRECISION, tBuf);
+
+	sprintf(_sendBuffer, "%c%c,%i,%i,%s,%i%c",
+		XPL_PACKETHEADER,
+		XPLREQUEST_UPDATES,
+		handle,
+		rate,
+		tBuf,
+		element,
+		XPL_PACKETTRAILER);
+
+	_transmitPacket();
+}

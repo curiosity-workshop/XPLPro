@@ -44,7 +44,7 @@ int drefBeacon;
 int drefNavLight, navlightPrevious = -1;
 int drefLdgLight;
 int drefGearDeployed;
-int drefThrottle;
+int drefThrottle;  float throttle1Previous;  float throttle2Previous;
 
 int cmdGearToggle;             // a handle for toggling landing gear up and down
 int cmdPause;                   // pause the sim
@@ -107,8 +107,7 @@ void loop()
  *  This reads the status of the beacon and sets the onboard LED on or off accordingly.  
  *  Note that the processing for synching the status of the beacon is handled automatically.
  */
-//  if (beacon) digitalWrite(LED_BUILTIN, HIGH);        // if beacon is on set the builtin led on
-//  else        digitalWrite(LED_BUILTIN, LOW);
+//  
 
 /*
  * This reads the status of the assigned pins and triggers commands accordingly.  It would be best to use a button library for this for debounce and one-shot purposes
@@ -119,9 +118,6 @@ void loop()
   if (!digitalRead(PIN_GOAROUND))   XP.commandTrigger(cmdToga);
   if (!digitalRead(PIN_PAUSE))      XP.commandTrigger(cmdPause);
   
-/*
- * This reads the status of the assigned pins and sets the dataref on/off accordingly.  
- */
 
   if (digitalRead(PIN_NAVLIGHT) != navlightPrevious)      // to conserve the flow of data we should keep track of the previously sent value so we don't send a new one every cycle
   {
@@ -146,17 +142,30 @@ void loop()
   if (!digitalRead(PIN_SAYSOMETHING)) XP.sendSpeakMessage("speech demonstration");
 
 /*
- * Read analog position of potentiometers representing throttles.  Use the map function to change the read value 0-1024 to a float 0.0 - 1.0
+ * Read analog position of potentiometers representing throttles.  Use the mapfloat function to change the read value 0-1024 to a float 0.0 - 1.0
+ * In this case the throttle dataref is an array, so we specify which element of the array as the third parameter of datarefWrite.
  */
+ if (analogRead(PIN_THROTTLE1) != throttle1Previous)     
+  {
+    throttle1Previous = analogRead(PIN_THROTTLE1);
+    XP.datarefWrite(drefThrottle, mapfloat(throttle1Previous, 0, 1024, (float)0, (float)1 ), 0);
+  }
  
- // throttle1 = mapfloat(analogRead(PIN_THROTTLE1), 0, 1024, (float)0, (float)1 );
- // throttle2 = mapfloat(analogRead(PIN_THROTTLE2), 0, 1024, (float)0, (float)1 );
-
+  if (analogRead(PIN_THROTTLE2) != throttle2Previous)     
+  {
+    throttle2Previous = analogRead(PIN_THROTTLE2);
+    XP.datarefWrite(drefThrottle, mapfloat(throttle2Previous, 0, 1024, (float)0, (float)1 ), 1);
+  }
 }
 
 
 void inboundHandler(int handle)
 {
+  if (handle == drefBeacon)
+  {   if (XP.readValueInt)   digitalWrite(LED_BUILTIN, HIGH);        // if beacon is on set the builtin led on
+      else                digitalWrite(LED_BUILTIN, LOW);
+   
+  }
   
 }
 
@@ -174,9 +183,9 @@ void registerXplaneStuff()          // this is the function we set as a callback
  * This example registers a dataref for the beacon light.  
  * In the loop section of the code we will turn on/off the LED on the arduino board to represent the status of the beacon light within xplane.
  */
-  drefBeacon = XP.registerDataRef("sim/cockpit2/switches/beacon_on");    //  use beacon light dataref for reading
-
-  
+  drefBeacon = XP.registerDataRef("sim/cockpit2/switches/beacon_on");    
+  XP.requestUpdates(drefBeacon, 100, 0);          // Tell xplane to send us updates when the status of the beacon light changes.  
+                                                  // 100 means don't update more often than every 100ms and 0 is a resolution divider which is explained in another dataref, use 0 if no divider required
   
 
 /*
@@ -184,7 +193,7 @@ void registerXplaneStuff()          // this is the function we set as a callback
  * In the loop section of the code we will check the status of the switch send it to the navLight variable which will automatically be sent to Xplane.
  * To test this, connect one side of a normal toggle switch to ground and the other to the pin used in the #define for PIN_NAVLIGHT (9)
  */
-  drefNavLight = XP.registerDataRef("sim/cockpit/electrical/nav_lights_on");    //  use navlight dataref for writing
+  drefNavLight = XP.registerDataRef("sim/cockpit/electrical/nav_lights_on");    
  
   
 /*
@@ -211,9 +220,13 @@ void registerXplaneStuff()          // this is the function we set as a callback
 /*
  * more examples for the testing box
  */
-  drefGearDeployed = XP.registerDataRef("sim/flightmodel2/gear/deploy_ratio");
+  drefGearDeployed = XP.registerDataRef("sim/flightmodel2/gear/deploy_ratio");            // this will be updated from xplane to tell us what position the landing gear is in
+  XP.requestUpdates(drefGearDeployed, 100, 0, 0);          // Tell xplane to send us updates when the status of the gear position changes.  
+  XP.requestUpdates(drefGearDeployed, 100, 0, 1);          // 100 means don't update more often than every 100ms and .1 is a resolution divider to reduce data flow
+  XP.requestUpdates(drefGearDeployed, 100, 0, 2);          // The additional parameter is the array element to reference, since this dataref is an array of values.  0=nose, 1=left, 2=right
+
+  drefThrottle = XP.registerDataRef("sim/cockpit2/engine/actuators/throttle_ratio");     // This is an array dataref.  We will be sending this data from a potentiometer
   
-  drefThrottle = XP.registerDataRef("sim/cockpit2/engine/actuators/throttle_ratio");     // Engine 1
    
 /*
  * Now register commands.  
