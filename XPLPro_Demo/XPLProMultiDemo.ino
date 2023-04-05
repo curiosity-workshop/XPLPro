@@ -45,6 +45,8 @@ int drefNavLight, navlightPrevious = -1;
 int drefLdgLight;
 int drefGearDeployed;
 int drefThrottle;  float throttle1Previous;  float throttle2Previous;
+int drefEngineRPM;
+
 
 int cmdGearToggle;             // a handle for toggling landing gear up and down
 int cmdPause;                   // pause the sim
@@ -103,17 +105,10 @@ void loop()
   if (millis() - startTime > 100) startTime = millis();   else return;          
 
 
-/*                      
- *  This reads the status of the beacon and sets the onboard LED on or off accordingly.  
- *  Note that the processing for synching the status of the beacon is handled automatically.
- */
-//  
-
 /*
  * This reads the status of the assigned pins and triggers commands accordingly.  It would be best to use a button library for this for debounce and one-shot purposes
  * I am not using one for simplicity in the demo.
  */
-
   if (!digitalRead(PIN_GEARTOGGLE)) XP.commandTrigger(cmdGearToggle);   
   if (!digitalRead(PIN_GOAROUND))   XP.commandTrigger(cmdToga);
   if (!digitalRead(PIN_PAUSE))      XP.commandTrigger(cmdPause);
@@ -127,12 +122,7 @@ void loop()
   
   //landingLights = digitalRead(PIN_LANDINGLIGHT);
 
-/*
- * This reads the status of the landing gear.  You could turn on lights or whatever.  The position is represented as a float between 0 and 1, 1 representing down and locked.
- */
-  //if (noseGear == 1)  digitalWrite(PIN_NOSEGEARLED, HIGH);  else digitalWrite(PIN_NOSEGEARLED, LOW);   
-  //if (leftGear == 1)  digitalWrite(PIN_LEFTGEARLED, HIGH);  else digitalWrite(PIN_LEFTGEARLED, LOW);   
-  //if (rightGear == 1) digitalWrite(PIN_RIGHTGEARLED, HIGH);  else digitalWrite(PIN_RIGHTGEARLED, LOW);   
+
   
   
 /*
@@ -142,30 +132,70 @@ void loop()
   if (!digitalRead(PIN_SAYSOMETHING)) XP.sendSpeakMessage("speech demonstration");
 
 /*
- * Read analog position of potentiometers representing throttles.  Use the mapfloat function to change the read value 0-1024 to a float 0.0 - 1.0
+ * Read analog position of potentiometers representing throttles.  Use the mapfloat function (below) to change the read value 0-1024 to a float 0.0 - 1.0
  * In this case the throttle dataref is an array, so we specify which element of the array as the third parameter of datarefWrite.
  */
- if (analogRead(PIN_THROTTLE1) != throttle1Previous)     
+  int throttle1Current = analogRead(PIN_THROTTLE1) /10;          // I am dividing by 10 here because I don't need 1024 units of resolution for the throttle position and this will reduce dataflow.
+  if (throttle1Current != throttle1Previous)     
   {
-    throttle1Previous = analogRead(PIN_THROTTLE1);
-    XP.datarefWrite(drefThrottle, mapfloat(throttle1Previous, 0, 1024, (float)0, (float)1 ), 0);
+    throttle1Previous = throttle1Current;
+    XP.datarefWrite(drefThrottle, mapfloat(throttle1Previous, 0, 102, 0, 1 ), 0);
   }
+
+  int throttle2Current = analogRead(PIN_THROTTLE2) /10;
+  if (throttle2Current != throttle2Previous)     
+  {
+    throttle2Previous = throttle2Current;
+    XP.datarefWrite(drefThrottle, mapfloat(throttle2Previous, 0, 102, 0, 1 ), 1);
+  }
+
  
-  if (analogRead(PIN_THROTTLE2) != throttle2Previous)     
-  {
-    throttle2Previous = analogRead(PIN_THROTTLE2);
-    XP.datarefWrite(drefThrottle, mapfloat(throttle2Previous, 0, 1024, (float)0, (float)1 ), 1);
-  }
+  
 }
 
-
+/*
+ * This function is the callback function we specified that will be called any time our requested data is sent to us.
+ * handle is the handle to the dataref.  The following variables within the plugin are how we receive the data:
+ * 
+ * readValueLong        If the dataref is of type INT
+ * readValueFloat       If the dataref is of type FLOAT
+ * readValueElement     If the dataref is an array, this is the element that changed
+ */
 void inboundHandler(int handle)
 {
   if (handle == drefBeacon)
-  {   if (XP.readValueInt)   digitalWrite(LED_BUILTIN, HIGH);        // if beacon is on set the builtin led on
-      else                digitalWrite(LED_BUILTIN, LOW);
-   
+  {   if (XP.readValueLong)   digitalWrite(LED_BUILTIN, HIGH);        // if beacon is on set the builtin led on
+      else                    digitalWrite(LED_BUILTIN, LOW);
   }
+
+  if (handle == drefEngineRPM)                      // display RPM on the LCD
+  {   lcd.setCursor(0,1);
+      lcd.print("Alt: ");
+      lcd.print((int)XP.readValueFloat);            // casted to INT to remove decimals
+  }
+
+/*
+ * This reads the status of the landing gear.  You could turn on lights as in this example.  The position is represented as a float between 0 and 1, 1 representing down and locked.
+ */
+  if (handle == drefGearDeployed)
+  { switch (XP.readValueElement)
+    {
+      case 0:     // nose gear
+        if (XP.readValueFloat == 1)    digitalWrite(PIN_NOSEGEARLED, HIGH);   else digitalWrite(PIN_NOSEGEARLED, LOW);
+        break;
+
+      case 1:     // Left Main 
+        if (XP.readValueFloat == 1)    digitalWrite(PIN_LEFTGEARLED, HIGH);   else digitalWrite(PIN_LEFTGEARLED, LOW);   
+        break;
+
+      case 2:     // Right Main
+        if (XP.readValueFloat == 1)    digitalWrite(PIN_RIGHTGEARLED, HIGH);  else digitalWrite(PIN_RIGHTGEARLED, LOW);   
+        break;
+  
+    }
+  }     
+     
+    
   
 }
 
@@ -189,8 +219,8 @@ void registerXplaneStuff()          // this is the function we set as a callback
   
 
 /*
- * This example registers a dataref for the nav light.  This time we will control the status of the beacon light with a switch.
- * In the loop section of the code we will check the status of the switch send it to the navLight variable which will automatically be sent to Xplane.
+ * This example registers a dataref for the nav light.  This time we will control the status of the light with a switch.
+ * In the loop section of the code we will check the status of the switch send it to the navLight dataref within Xplane.
  * To test this, connect one side of a normal toggle switch to ground and the other to the pin used in the #define for PIN_NAVLIGHT (9)
  */
   drefNavLight = XP.registerDataRef("sim/cockpit/electrical/nav_lights_on");    
@@ -213,19 +243,22 @@ void registerXplaneStuff()          // this is the function we set as a callback
  * It would look like this:
  * 
  *   Xc.registerDataRef(F("sim/cockpit/electrical/nav_lights_on"), XPL_READ);
+ *   // NOT IMPLEMENTED YET!
  */
-
   
   
 /*
  * more examples for the testing box
  */
   drefGearDeployed = XP.registerDataRef("sim/flightmodel2/gear/deploy_ratio");            // this will be updated from xplane to tell us what position the landing gear is in
-  XP.requestUpdates(drefGearDeployed, 100, 0, 0);          // Tell xplane to send us updates when the status of the gear position changes.  
-  XP.requestUpdates(drefGearDeployed, 100, 0, 1);          // 100 means don't update more often than every 100ms and .1 is a resolution divider to reduce data flow
-  XP.requestUpdates(drefGearDeployed, 100, 0, 2);          // The additional parameter is the array element to reference, since this dataref is an array of values.  0=nose, 1=left, 2=right
+  XP.requestUpdates(drefGearDeployed, 100, 1, 0);          // Tell xplane to send us updates when the status of the gear position changes.  
+  XP.requestUpdates(drefGearDeployed, 100, 1, 1);          // 100 means don't update more often than every 100ms and .1 is a resolution divider to reduce data flow.  eg we probably arent interested in .001 of gear position.
+  XP.requestUpdates(drefGearDeployed, 100, 1, 2);          // The additional parameter is the array element to reference, since this dataref is an array of values.  0=nose, 1=left, 2=right
+    
+  drefThrottle = XP.registerDataRef("sim/cockpit2/engine/actuators/throttle_ratio");      // This is an array dataref.  We will be sending this data from a potentiometer
 
-  drefThrottle = XP.registerDataRef("sim/cockpit2/engine/actuators/throttle_ratio");     // This is an array dataref.  We will be sending this data from a potentiometer
+  drefEngineRPM = XP.registerDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot");   // indicated altitude for display on the LCD screen.  This is a float 
+  XP.requestUpdates(drefEngineRPM, 100, 10);                                                // divide by 10 to show increments of 10 feet
   
    
 /*

@@ -136,7 +136,7 @@ void XPLPro::datarefWrite(int handle, int value)
 void XPLPro::datarefWrite(int handle, int value, int arrayElement)
 {
 	if (handle < 0) return;
-	sprintf(_sendBuffer, "%c%c,%i,%i,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, arrayElement, XPL_PACKETTRAILER);
+	sprintf(_sendBuffer, "%c%c,%i,%i,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINTARRAY, handle, value, arrayElement, XPL_PACKETTRAILER);
 	_transmitPacket();
 
 }
@@ -155,7 +155,7 @@ void XPLPro::datarefWrite(int handle, long int value, int arrayElement)
 {
 
 	if (handle < 0) return;
-	sprintf(_sendBuffer, "%c%c,%i,%ld,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, arrayElement, XPL_PACKETTRAILER);
+	sprintf(_sendBuffer, "%c%c,%i,%ld,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINTARRAY, handle, value, arrayElement, XPL_PACKETTRAILER);
 	_transmitPacket();
 
 }
@@ -187,7 +187,7 @@ void XPLPro::datarefWrite(int handle, float value, int arrayElement)
 
 		sprintf(_sendBuffer, "%c%c,%i,%s,%i%c",
 			XPL_PACKETHEADER,
-			XPLCMD_DATAREFUPDATEFLOAT,
+			XPLCMD_DATAREFUPDATEFLOATARRAY,
 			handle,
 			tBuf,
 			arrayElement,
@@ -297,7 +297,16 @@ void XPLPro::_processPacket()
 		case XPLCMD_DATAREFUPDATEINT :
 		
 			_parseInt(&tHandle, _receiveBuffer, 2);
-			_parseInt(&readValueInt, _receiveBuffer, 3);
+			_parseInt(&readValueLong, _receiveBuffer, 3);
+			readValueElement = 0;
+			_xplInboundHandler(tHandle);
+			break;
+
+		case XPLCMD_DATAREFUPDATEINTARRAY:
+
+			_parseInt(&tHandle, _receiveBuffer, 2);
+			_parseInt(&readValueLong, _receiveBuffer, 3);
+			_parseInt(&readValueElement, _receiveBuffer, 4);
 			_xplInboundHandler(tHandle);
 			break;
 
@@ -308,6 +317,14 @@ void XPLPro::_processPacket()
 			_xplInboundHandler(tHandle);
 			break;
 		
+		case XPLCMD_DATAREFUPDATEFLOATARRAY:
+
+			_parseInt(&tHandle, _receiveBuffer, 2);
+			_parseFloat(&readValueFloat, _receiveBuffer, 3);
+			_parseInt(&readValueElement, _receiveBuffer, 4);
+			_xplInboundHandler(tHandle);
+			break;
+	
 		case XPLREQUEST_REFRESH:
 			break;
 		
@@ -407,6 +424,33 @@ int XPLPro::_parseInt(int* outTarget, char* inBuffer, int parameter)
 	return 0;
 
 }
+
+int XPLPro::_parseInt(long int* outTarget, char* inBuffer, int parameter)
+{
+	int cBeg;
+	int pos = 0;
+
+	for (int i = 1; i < parameter; i++)
+	{
+
+		while (inBuffer[pos] != ',' && inBuffer[pos] != NULL) pos++;
+		pos++;
+
+	}
+	cBeg = pos;
+
+	while (inBuffer[pos] != ',' && inBuffer[pos] != NULL && inBuffer[pos] != XPL_PACKETTRAILER) pos++;
+
+	char holdChar = inBuffer[pos];
+	inBuffer[pos] = 0;
+	*outTarget = atoi((char*)&inBuffer[cBeg]);
+
+	inBuffer[pos] = holdChar;
+
+	return 0;
+
+}
+
 int XPLPro::_parseFloat(float* outTarget, char* inBuffer, int parameter)
 {
 	int cBeg;
@@ -526,7 +570,7 @@ void XPLPro::requestUpdates(int handle, int rate, float divider, int element)
 
 	sprintf(_sendBuffer, "%c%c,%i,%i,%s,%i%c",
 		XPL_PACKETHEADER,
-		XPLREQUEST_UPDATES,
+		XPLREQUEST_UPDATESARRAY,
 		handle,
 		rate,
 		tBuf,

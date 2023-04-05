@@ -52,7 +52,7 @@
 #define XPLRESPONSE_COMMAND        'C'          // Plugin responds with handle to command or - value if not found.  command handle, command name
 #define XPLRESPONSE_VERSION        'v'          // Arduino responds with build version number if requested
 #define XPLCMD_PRINTDEBUG          'g'          // plugin logs string sent from arduino
-#define XPLCMD_RESET               '3'
+#define XPLCMD_RESET               'z'
 #define XPLCMD_SPEAK               's'          // plugin speaks string through xplane speech 
 #define XPLCMD_SENDNAME            'N'          // plugin request name from arduino
 #define XPLREQUEST_REGISTERDATAREF 'b'   // 
@@ -62,9 +62,11 @@
 #define XPLREQUEST_UPDATES         'r'          // arduino is asking the plugin to update the specified dataref with rate and divider parameters
 #define XPLREQUEST_UPDATESARRAY     't'
 
-#define XPLCMD_DATAREFUPDATEINT       '1'
-#define XPLCMD_DATAREFUPDATEFLOAT       '2'
-#define XPLCMD_DATAREFUPDATESTRING	'3'
+#define XPLCMD_DATAREFUPDATEINT			'1'
+#define XPLCMD_DATAREFUPDATEFLOAT		'2'
+#define XPLCMD_DATAREFUPDATEINTARRAY	'3'
+#define XPLCMD_DATAREFUPDATEFLOATARRAY	'4'
+#define XPLCMD_DATAREFUPDATESTRING		'9'
 
 #define XPLCMD_SENDREQUEST         'Q'          // plugin sends this when it is ready to register bindings
 //#define XPLCMD_DEVICEREADY         'g'
@@ -127,9 +129,10 @@ class XPLPro
     void sendResetRequest(void);
     int xloop(void);                                                                            // where the magic happens!
   
-    int readValueInt;
-    long readValueLong;
+    //int readValueInt;
+    long int readValueLong;
     float readValueFloat;
+    int readValueElement;
 
 
   private:
@@ -147,6 +150,7 @@ class XPLPro
      
       
       int _parseInt(int* outTarget, char* inBuffer, int parameter);
+      int _parseInt(long int* outTarget, char* inBuffer, int parameter);
       int _parseFloat(float* outTarget, char* inBuffer, int parameter);
       int _parseString(char* outBuffer, char* inBuffer, int parameter, int maxSize);
           
