@@ -4,6 +4,8 @@
  * 
  * XPLProMultiDemo
  * 
+ * Created by Curiosity Workshop for XPL/Pro arduino->XPlane system.
+ * 
  * This sketch was developed and tested on an Arduino Mega.
  * 
    To report problems, download updates and examples, suggest enhancements or get technical support:
@@ -43,6 +45,7 @@ long int startTime;
 int drefBeacon;
 int drefNavLight, navlightPrevious = -1;
 int drefLdgLight;
+int drefTaxiLight;
 int drefGearDeployed;
 int drefThrottle;  float throttle1Previous;  float throttle2Previous;
 int drefEngineRPM;
@@ -134,19 +137,20 @@ void loop()
 /*
  * Read analog position of potentiometers representing throttles.  Use the mapfloat function (below) to change the read value 0-1024 to a float 0.0 - 1.0
  * In this case the throttle dataref is an array, so we specify which element of the array as the third parameter of datarefWrite.
+ * We also should track and compare to the previous value so that we don't send the same value every cycle.
  */
   int throttle1Current = analogRead(PIN_THROTTLE1) /10;          // I am dividing by 10 here because I don't need 1024 units of resolution for the throttle position and this will reduce dataflow.
   if (throttle1Current != throttle1Previous)     
   {
     throttle1Previous = throttle1Current;
-    XP.datarefWrite(drefThrottle, mapfloat(throttle1Previous, 0, 102, 0, 1 ), 0);
+    XP.datarefWrite(drefThrottle, throttle1Current, 0);           // we already requested scaling (map) from the plugin so just send the raw data.  
   }
 
   int throttle2Current = analogRead(PIN_THROTTLE2) /10;
   if (throttle2Current != throttle2Previous)     
   {
     throttle2Previous = throttle2Current;
-    XP.datarefWrite(drefThrottle, mapfloat(throttle2Previous, 0, 102, 0, 1 ), 1);
+    XP.datarefWrite(drefThrottle, throttle2Current, 1);
   }
 
  
@@ -203,15 +207,11 @@ void registerXplaneStuff()          // this is the function we set as a callback
 {
 
  
- // register whatever datarefs we want to use.
-  // Parameters are:  registerDataRef(  char *        dataref name, a c style string that identifies the dataref
-  //                                    int           read mode, can be XPL_READ or XPL_WRITE or XPL_READWRITE
-  //                                    
-     
-
+ 
 /*
  * This example registers a dataref for the beacon light.  
  * In the loop section of the code we will turn on/off the LED on the arduino board to represent the status of the beacon light within xplane.
+ * 
  */
   drefBeacon = XP.registerDataRef("sim/cockpit2/switches/beacon_on");    
   XP.requestUpdates(drefBeacon, 100, 0);          // Tell xplane to send us updates when the status of the beacon light changes.  
@@ -220,6 +220,9 @@ void registerXplaneStuff()          // this is the function we set as a callback
 
 /*
  * This example registers a dataref for the nav light.  This time we will control the status of the light with a switch.
+ * It is up to you to confirm that the datarefs you utilize are writable.  A handy website allows you to search 
+ * for them and understand their attributes:  https://developer.x-plane.com/datarefs/
+ * 
  * In the loop section of the code we will check the status of the switch send it to the navLight dataref within Xplane.
  * To test this, connect one side of a normal toggle switch to ground and the other to the pin used in the #define for PIN_NAVLIGHT (9)
  */
@@ -240,13 +243,15 @@ void registerXplaneStuff()          // this is the function we set as a callback
 
 
 /* Another way to save RAM on AVR boards such as the NANO and the UNO and the MEGA is to use the F() macro to store the string in flash memory rather than RAM.  
- * It would look like this:
- * 
- *   Xc.registerDataRef(F("sim/cockpit/electrical/nav_lights_on"), XPL_READ);
- *   // NOT IMPLEMENTED YET!
+ *  
+ *  Most non AVR boards don't support this so remove the F() macro if it won't compile.
+ *  
+ *   
  */
-  
-  
+ 
+   drefTaxiLight = XP.registerDataRef(F("sim/cockpit2/switches/taxi_light_on"));
+
+   
 /*
  * more examples for the testing box
  */
@@ -256,6 +261,8 @@ void registerXplaneStuff()          // this is the function we set as a callback
   XP.requestUpdates(drefGearDeployed, 100, 1, 2);          // The additional parameter is the array element to reference, since this dataref is an array of values.  0=nose, 1=left, 2=right
     
   drefThrottle = XP.registerDataRef("sim/cockpit2/engine/actuators/throttle_ratio");      // This is an array dataref.  We will be sending this data from a potentiometer
+  XP.setScaling(drefThrottle, 0, 102, 0, 1);                                              // this uses a map style function to convert values 0-102 to a float value of 0-1.  Since analogRead returns 0-1024, we will divide it
+                                                                                          // by 10 when we read it then convert 0-102 to a float value of 0-1.
 
   drefEngineRPM = XP.registerDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot");   // indicated altitude for display on the LCD screen.  This is a float 
   XP.requestUpdates(drefEngineRPM, 100, 10);                                                // divide by 10 to show increments of 10 feet
@@ -276,12 +283,4 @@ void shutdownXplaneStuff()
 {
   // if you need to do things when xplane shuts down or unloads an aircraft, do it here.
   
-}
-
-/*
- * Floating point version of the map function
- */
-float mapfloat(long x, long in_min, long in_max, long out_min, long out_max)
-{
-  return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min;
 }

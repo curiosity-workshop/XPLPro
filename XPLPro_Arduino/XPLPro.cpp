@@ -93,36 +93,6 @@ int XPLPro::sendSpeakMessage(const char* msg)
 	return 1;
 }
 
-/*
-
-int XPLPro::hasUpdated(int handle)
-{
-	
-	return false;
-}
-
-int XPLPro::datarefsUpdated()
-{
-	
-	return false;
-}
-
-void XPLPro::datarefRead(int handle, long int * value)
-{
-	//if (_dataRefs[handle]->dataRefHandle >= 0 && (_dataRefs[handle]->dataRefRWType == XPL_READ || _dataRefs[handle]->dataRefRWType == XPL_READWRITE))
-	//    *value =  *(long int *)_dataRefs[handle]->latestValue;
-	
-}
-
-void XPLPro::datarefRead(int handle, float * value)
-{
-	//if (_dataRefs[handle]->dataRefHandle >= 0 && (_dataRefs[handle]->dataRefRWType == XPL_READ || _dataRefs[handle]->dataRefRWType == XPL_READWRITE))
-//		*value = *(float*)_dataRefs[handle]->latestValue;
-
-	
-}
-*/
-
 // these could be done better:
 
 void XPLPro::datarefWrite(int handle, int value)
@@ -203,10 +173,8 @@ void XPLPro::_sendname()
 	if (_deviceName != NULL)
 	{
 		_sendPacketString(XPLRESPONSE_NAME, _deviceName);
-		
+
 	}
-		
-	//_xplInitFunction();						// Call the init function since we know xplane and the plugin are up and running
 
 }
 
@@ -282,8 +250,6 @@ void XPLPro::_processPacket()
 		case XPLRESPONSE_DATAREF :
 		   
 			_parseInt(&_handleAssignment, _receiveBuffer, 2);
-		//	sprintf(tStr, "dr response rx: %i", _handleAssignment);
-	//		sendDebugMessage(tStr);
 			break;
 		
 
@@ -481,20 +447,33 @@ int XPLPro::_parseFloat(float* outTarget, char* inBuffer, int parameter)
 
 
 
-/*
+
 #ifdef XPL_USE_PROGMEM
 int XPLPro::registerDataRef(const __FlashStringHelper* datarefName)
 {
-	return -1;
+	long int startTime;
+
+	if (!_registerFlag) return -1;
+
+	sprintf(_sendBuffer, "%c%c,\"%S\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERDATAREF, datarefName, XPL_PACKETTRAILER);
+	_transmitPacket();
+
+	_handleAssignment = -1;
+	startTime = millis();					// for timeout function
+
+	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment < 0)
+		_processSerial();
+
+	return _handleAssignment;
+
 }
+
 #endif
-*/
 
 int XPLPro::registerDataRef(const char* datarefName)
 {
 	long int startTime;
 
-	
 	if (!_registerFlag) return -1;
 
 	sprintf(_sendBuffer, "%c%c,\"%s\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERDATAREF, datarefName, XPL_PACKETTRAILER);
@@ -506,25 +485,35 @@ int XPLPro::registerDataRef(const char* datarefName)
 	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment<0 )
 		_processSerial();
 		
-	//if (millis() - startTime > XPL_RESPONSE_TIMEOUT) sendDebugMessage("dr timed out...");
-
 	return _handleAssignment;
 	
 
 	
 }
 
-/*
+
 
 #ifdef XPL_USE_PROGMEM
 int XPLPro::registerCommand(const __FlashStringHelper* commandName)		// user will trigger commands with commandTrigger
 {
 
-	return -1;
+	long int startTime;
+
+	startTime = millis();					// for timeout function
+
+	sprintf(_sendBuffer, "%c%c,\"%S\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERCOMMAND, commandName, XPL_PACKETTRAILER);
+	_transmitPacket();
+
+	_handleAssignment = -1;
+
+	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment < 0)
+		_processSerial();
+
+	return _handleAssignment;
+
 	
 }
 #endif
-*/
 
 int XPLPro::registerCommand(const char* commandName)		// user will trigger commands with commandTrigger
 {
@@ -547,10 +536,10 @@ int XPLPro::registerCommand(const char* commandName)		// user will trigger comma
 	
 }
 
-void XPLPro::requestUpdates(int handle, int rate, float divider)
+void XPLPro::requestUpdates(int handle, int rate, float precision)
 {
-	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
-	dtostrf(divider, 0, XPL_FLOATPRECISION, tBuf);
+	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer?
+	dtostrf(precision, 0, XPL_FLOATPRECISION, tBuf);
 
 	sprintf(_sendBuffer, "%c%c,%i,%i,%s%c",
 		XPL_PACKETHEADER,
@@ -563,10 +552,10 @@ void XPLPro::requestUpdates(int handle, int rate, float divider)
 	_transmitPacket();
 }
 
-void XPLPro::requestUpdates(int handle, int rate, float divider, int element)
+void XPLPro::requestUpdates(int handle, int rate, float precision, int element)
 {
-	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
-	dtostrf(divider, 0, XPL_FLOATPRECISION, tBuf);
+	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer?
+	dtostrf(precision, 0, XPL_FLOATPRECISION, tBuf);
 
 	sprintf(_sendBuffer, "%c%c,%i,%i,%s,%i%c",
 		XPL_PACKETHEADER,
@@ -575,6 +564,22 @@ void XPLPro::requestUpdates(int handle, int rate, float divider, int element)
 		rate,
 		tBuf,
 		element,
+		XPL_PACKETTRAILER);
+
+	_transmitPacket();
+}
+
+void XPLPro::setScaling(int handle, int inLow, int inHigh, int outLow, int outHigh)
+{
+	
+	sprintf(_sendBuffer, "%c%c,%i,%i,%i,%i,%i%c",
+		XPL_PACKETHEADER,
+		XPLREQUEST_SCALING,
+		handle,
+		inLow,
+		inHigh,
+		outLow,
+		outHigh,
 		XPL_PACKETTRAILER);
 
 	_transmitPacket();

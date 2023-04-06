@@ -17,7 +17,7 @@
 #define XPL_FLOATPRECISION      2                   // how many decimals of precision for floating point datarefs.  More increases dataflow (default 2)
 
 #define XPL_RX_TIMEOUT          500               // after detecting a frame header, how long will we wait to receive the rest of the frame.  (default 500 ms)
-#define XPL_RESPONSE_TIMEOUT    60000              // after sending a registration request, how long will we wait for the response.  
+#define XPL_RESPONSE_TIMEOUT    90000              // after sending a registration request, how long will we wait for the response.  
                                                     // this is giant because sometimes xplane says the plane is loaded then does other stuff for a while. (default 60000 ms)  
 
 #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) || defined (__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)        // add to this for boards that need it
@@ -60,6 +60,7 @@
 #define XPLREQUEST_NOREQUESTS      'c'   // nothing to request
 #define XPLREQUEST_REFRESH         'd'	//  the plugin will call this once xplane is loaded in order to get fresh updates from arduino handles that write
 #define XPLREQUEST_UPDATES         'r'          // arduino is asking the plugin to update the specified dataref with rate and divider parameters
+#define XPLREQUEST_SCALING          'u'          // arduino requests the plugin apply scaling to the dataref values
 #define XPLREQUEST_UPDATESARRAY     't'
 
 #define XPLCMD_DATAREFUPDATEINT			'1'
@@ -106,25 +107,26 @@ class XPLPro
     void datarefWrite(int handle, float value);
     void datarefWrite(int handle, float value, int arrayElement);
 
-    void requestUpdates(int handle, int rate, float divider);
-    void requestUpdates(int handle, int rate, float divider, int element);
+    void requestUpdates(int handle, int rate, float precision);
+    void requestUpdates(int handle, int rate, float precision, int element);
     
-    
+    void setScaling(int handle, int inLow, int inHigh, int outLow, int outHigh);
+
    // void datarefRead(int handle, long int *value);
    // void datarefRead(int handle, float *value);
 
 
     int registerDataRef(const char *datarefName);                    
-  //  int registerDataRef(const __FlashStringHelper*);
     int registerCommand(const char* commandName);                                           // register a command    
-  //  int registerCommand(const __FlashStringHelper* commandName);                                // use this overload to trigger the command manually (commandTrigger)
 
-     
-                                                                                                //int sendReadyCommand(void);
-    //int getCurrentData(int, int*);
+#ifdef XPL_USE_PROGMEM
+    int registerDataRef(const __FlashStringHelper*);
+    int registerCommand(const __FlashStringHelper* commandName);                                // use this overload to trigger the command manually (commandTrigger)
+#endif
+
     int sendDebugMessage(const char*);
     int sendSpeakMessage(const char* msg);
- //   int allDataRefsRegistered(void);
+ 
    			                                       
     void sendResetRequest(void);
     int xloop(void);                                                                            // where the magic happens!
