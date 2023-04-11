@@ -1,586 +1,517 @@
-/*
-  XPLPro.cpp 
-  Created by Curiosity Workshop, Michael Gerlicher, 2023.
- 
-*/
-
-
-#include <arduino.h>
+// XPLPro.cpp
+// Created by Curiosity Workshop, Michael Gerlicher, 2023.
 #include "XPLPro.h"
 
-
-XPLPro::XPLPro(Stream* device)
+XPLPro::XPLPro(Stream *device)
 {
-	streamPtr = device;
-	streamPtr->setTimeout(XPL_RX_TIMEOUT);
+    _streamPtr = device;
+    _streamPtr->setTimeout(XPL_RX_TIMEOUT);
 }
 
-void XPLPro::begin(char * devicename, void *initFunction, void *stopFunction, void *inboundHandler)
+void XPLPro::begin(const char *devicename, void (*initFunction)(void), void (*stopFunction)(void), void (*inboundHandler)(int))
 {
-		
-	_deviceName = devicename;
-	_connectionStatus = 0;
-	_receiveBuffer[0] = 0;
-	_registerFlag = 0;
-		
-	_xplInitFunction = initFunction;
-	_xplStopFunction = stopFunction;
-	_xplInboundHandler = inboundHandler;
+    _deviceName = (char *)devicename;
+    _connectionStatus = 0;
+    _receiveBuffer[0] = 0;
+    _registerFlag = 0;
+    _xplInitFunction = initFunction;
+    _xplStopFunction = stopFunction;
+    _xplInboundHandler = inboundHandler;
 }
-
-
 
 int XPLPro::xloop(void)
 {
-	_processSerial();
-	if (_registerFlag) _xplInitFunction();				// handle registrations
-	_registerFlag = 0;
-
-	return _connectionStatus;
+    // handle incoming serial data
+    _processSerial();
+    // when device is registered, perform handle registrations
+    if (_registerFlag)
+    {
+        _xplInitFunction();
+        _registerFlag = 0;
+    }
+    // return status of connection
+    return _connectionStatus;
 }
 
-int XPLPro::commandTrigger(int commandHandle)
-{
-	return commandTrigger(commandHandle, 1);
-
-}
-
+// TODO: is a return value necessary? These could also be void like for the datarefs
 int XPLPro::commandTrigger(int commandHandle, int triggerCount)
 {
-	if (commandHandle < 0) return;
-	sprintf(_sendBuffer, "%c%c,%i,%i,%c", XPL_PACKETHEADER, XPLCMD_COMMANDTRIGGER, commandHandle, triggerCount, XPL_PACKETTRAILER);
-	_transmitPacket();
-	
-	return 0;
+    if (commandHandle < 0)
+    {
+        return XPL_HANDLE_INVALID;
+    }
+    sprintf(_sendBuffer, "%c%c,%i,%i%c", XPL_PACKETHEADER, XPLCMD_COMMANDTRIGGER, commandHandle, triggerCount, XPL_PACKETTRAILER);
+    _transmitPacket();
+    return 0;
 }
 
 int XPLPro::commandStart(int commandHandle)
 {
-	
-	_sendPacketVoid(XPLCMD_COMMANDSTART, commandHandle);
-	return 0;
-
+    if (commandHandle < 0)
+    {
+        return XPL_HANDLE_INVALID;
+    }
+    _sendPacketVoid(XPLCMD_COMMANDSTART, commandHandle);
+    return 0;
 }
 
 int XPLPro::commandEnd(int commandHandle)
 {
-	
-	_sendPacketVoid(XPLCMD_COMMANDEND, commandHandle);
-	return 0;
-
+    if (commandHandle < 0)
+    {
+        return XPL_HANDLE_INVALID;
+    }
+    _sendPacketVoid(XPLCMD_COMMANDEND, commandHandle);
+    return 0;
 }
 
 int XPLPro::connectionStatus()
 {
-	return _connectionStatus;
-
+    return _connectionStatus;
 }
 
-
-int XPLPro::sendDebugMessage(const char* msg)
+int XPLPro::sendDebugMessage(const char *msg)
 {
-	
-	_sendPacketString(XPLCMD_PRINTDEBUG, msg);
-
-	return 1;
+    _sendPacketString(XPLCMD_PRINTDEBUG, msg);
+    return 1;
 }
 
-int XPLPro::sendSpeakMessage(const char* msg)
+int XPLPro::sendSpeakMessage(const char *msg)
 {
-
-	_sendPacketString(XPLCMD_SPEAK, msg);
-
-	return 1;
+    _sendPacketString(XPLCMD_SPEAK, msg);
+    return 1;
 }
 
 // these could be done better:
 
 void XPLPro::datarefWrite(int handle, int value)
 {
-	if (handle < 0) return;
-	sprintf(_sendBuffer, "%c%c,%i,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, XPL_PACKETTRAILER);
-	_transmitPacket();
-	
+    if (handle < 0)
+    {
+        return;
+    }
+    sprintf(_sendBuffer, "%c%c,%i,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, XPL_PACKETTRAILER);
+    _transmitPacket();
 }
 
 void XPLPro::datarefWrite(int handle, int value, int arrayElement)
 {
-	if (handle < 0) return;
-	sprintf(_sendBuffer, "%c%c,%i,%i,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINTARRAY, handle, value, arrayElement, XPL_PACKETTRAILER);
-	_transmitPacket();
-
+    if (handle < 0)
+    {
+        return;
+    }
+    sprintf(_sendBuffer, "%c%c,%i,%i,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINTARRAY, handle, value, arrayElement, XPL_PACKETTRAILER);
+    _transmitPacket();
 }
 
-void XPLPro::datarefWrite(int handle, long int value)
+void XPLPro::datarefWrite(int handle, long value)
 {
-
-	if (handle < 0) return;
-	sprintf(_sendBuffer, "%c%c,%i,%ld%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, XPL_PACKETTRAILER);
-	_transmitPacket();
-
-
+    if (handle < 0)
+    {
+        return;
+    }
+    sprintf(_sendBuffer, "%c%c,%i,%ld%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINT, handle, value, XPL_PACKETTRAILER);
+    _transmitPacket();
 }
 
-void XPLPro::datarefWrite(int handle, long int value, int arrayElement)
+void XPLPro::datarefWrite(int handle, long value, int arrayElement)
 {
-
-	if (handle < 0) return;
-	sprintf(_sendBuffer, "%c%c,%i,%ld,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINTARRAY, handle, value, arrayElement, XPL_PACKETTRAILER);
-	_transmitPacket();
-
+    if (handle < 0)
+    {
+        return;
+    }
+    sprintf(_sendBuffer, "%c%c,%i,%ld,%i%c", XPL_PACKETHEADER, XPLCMD_DATAREFUPDATEINTARRAY, handle, value, arrayElement, XPL_PACKETTRAILER);
+    _transmitPacket();
 }
 
 void XPLPro::datarefWrite(int handle, float value)
 {
-	if (handle < 0) return;
-
-	char tBuf[20];				//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
-		dtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
-
-		sprintf(_sendBuffer, "%c%c,%i,%s%c",
-			XPL_PACKETHEADER,
-			XPLCMD_DATAREFUPDATEFLOAT,
-			handle,
-			tBuf,
-			XPL_PACKETTRAILER);
-	
-	_transmitPacket();
-
+    if (handle < 0)
+    {
+        return;
+    }
+    char tBuf[20]; // todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
+    dtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
+    sprintf(_sendBuffer, "%c%c,%i,%s%c",
+            XPL_PACKETHEADER,
+            XPLCMD_DATAREFUPDATEFLOAT,
+            handle,
+            tBuf,
+            XPL_PACKETTRAILER);
+    _transmitPacket();
 }
 
 void XPLPro::datarefWrite(int handle, float value, int arrayElement)
 {
-	if (handle < 0) return;
-	
-	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
-		dtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
-
-		sprintf(_sendBuffer, "%c%c,%i,%s,%i%c",
-			XPL_PACKETHEADER,
-			XPLCMD_DATAREFUPDATEFLOATARRAY,
-			handle,
-			tBuf,
-			arrayElement,
-			XPL_PACKETTRAILER);
-
-	_transmitPacket();
-
+    if (handle < 0)
+    {
+        return;
+    }
+    char tBuf[20]; // todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
+    dtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
+    sprintf(_sendBuffer, "%c%c,%i,%s,%i%c",
+            XPL_PACKETHEADER,
+            XPLCMD_DATAREFUPDATEFLOATARRAY,
+            handle,
+            tBuf,
+            arrayElement,
+            XPL_PACKETTRAILER);
+    _transmitPacket();
 }
-
 
 void XPLPro::_sendname()
 {
-	if (_deviceName != NULL)
-	{
-		_sendPacketString(XPLRESPONSE_NAME, _deviceName);
-
-	}
-
+    // register device on request only when we have a valid name
+    if (_deviceName != NULL)
+    {
+        _sendPacketString(XPLRESPONSE_NAME, _deviceName);
+    }
 }
-
-
 
 void XPLPro::sendResetRequest()
 {
-
-	if (_deviceName != NULL)
-	{
-		_sendPacketVoid(XPLCMD_RESET, 0);
-	}
-
-
+    // request a reset only when we have a valid name
+    if (_deviceName != NULL)
+    {
+        _sendPacketVoid(XPLCMD_RESET, 0);
+    }
 }
 
 void XPLPro::_processSerial()
 {
-
-
-	while (streamPtr->available() && _receiveBuffer[0] != XPL_PACKETHEADER)  _receiveBuffer[0] = (char)streamPtr->read();
-
-	if (_receiveBuffer[0] != XPL_PACKETHEADER) return;
-
-
-	_receiveBufferBytesReceived = streamPtr->readBytesUntil(XPL_PACKETTRAILER, (char*)&_receiveBuffer[1], XPLMAX_PACKETSIZE - 1);
-
-	if (_receiveBufferBytesReceived == 0)
-	{
-		_receiveBuffer[0] = 0;
-		return;
-	}
-
-
-	_receiveBuffer[++_receiveBufferBytesReceived] = XPL_PACKETTRAILER;
-	_receiveBuffer[++_receiveBufferBytesReceived] = 0;							// old habits die hard.  
-
-	// at this point we should have a valid frame
-	_processPacket();
-	
+    // read until package header found or buffer empty
+    while (_streamPtr->available() && _receiveBuffer[0] != XPL_PACKETHEADER)
+    {
+        _receiveBuffer[0] = (char)_streamPtr->read();
+    }
+    // return when buffer empty and header not found
+    if (_receiveBuffer[0] != XPL_PACKETHEADER)
+    {
+        return;
+    }
+    // read rest of package until trailer
+    _receiveBufferBytesReceived = _streamPtr->readBytesUntil(XPL_PACKETTRAILER, (char *)&_receiveBuffer[1], XPLMAX_PACKETSIZE_RECEIVE - 1);
+    // if no further chars available, delete package
+    if (_receiveBufferBytesReceived == 0)
+    {
+        _receiveBuffer[0] = 0;
+        return;
+    }
+    // add package trailer and zero byte to frame
+    _receiveBuffer[++_receiveBufferBytesReceived] = XPL_PACKETTRAILER;
+    _receiveBuffer[++_receiveBufferBytesReceived] = 0; // old habits die hard.
+    // at this point we should have a valid frame
+    _processPacket();
 }
 
 void XPLPro::_processPacket()
 {
-	int tHandle;
-	
-	if (_receiveBuffer[0] != XPL_PACKETHEADER) return;
+    int tHandle;
+    // check whether we have a valid frame
+    if (_receiveBuffer[0] != XPL_PACKETHEADER)
+    {
+        return;
+    }
+    // branch on receiverd command
+    switch (_receiveBuffer[1])
+    {
+    // plane unloaded or XP exiting
+    case XPL_EXITING:
+        _connectionStatus = false;
+        _xplStopFunction();
+        break;
 
-	switch (_receiveBuffer[1])
-	{
-		
+    // register device
+    case XPLCMD_SENDNAME:
+        _sendname();
+        _connectionStatus = true; // not considered active till you know my name
+        _registerFlag = 0;
+        break;
 
-		case XPL_EXITING :					
-		
-			_connectionStatus = false;
-			_xplStopFunction();
-			break;
-		
+    // plugin is ready for registrations.
+    case XPLCMD_SENDREQUEST:
+        _registerFlag = 1; // use a flag to signal registration so recursion doesn't occur
+        break;
 
-	    case XPLCMD_SENDNAME :
-		
-			_sendname();
-			_connectionStatus = true;			//not considered active till you know my name
-			_registerFlag = 0;	
-			break;
-		
+    // get handle from response to registered dataref
+    case XPLRESPONSE_DATAREF:
+        _parseInt(&_handleAssignment, _receiveBuffer, 2);
+        break;
 
-		case XPLCMD_SENDREQUEST :
-			_registerFlag = 1;				// plugin is ready for registrations.  Use a flag so recursion doesn't occur
-			
-			break;
+    // get handle from response to registered command
+    case XPLRESPONSE_COMMAND:
+        _parseInt(&_handleAssignment, _receiveBuffer, 2);
+        break;
 
-		case XPLRESPONSE_DATAREF :
-		   
-			_parseInt(&_handleAssignment, _receiveBuffer, 2);
-			break;
-		
+    // int dataref received
+    case XPLCMD_DATAREFUPDATEINT:
+        _parseInt(&tHandle, _receiveBuffer, 2);
+        _parseInt(&_readValueLong, _receiveBuffer, 3);
+        _readValueFloat = 0;
+        _readValueElement = 0;
+        _xplInboundHandler(tHandle);
+        break;
 
-		case XPLRESPONSE_COMMAND:
-		
-			_parseInt(&_handleAssignment, _receiveBuffer, 2);
-			break;
-		
+    // int array dataref received
+    case XPLCMD_DATAREFUPDATEINTARRAY:
+        _parseInt(&tHandle, _receiveBuffer, 2);
+        _parseInt(&_readValueLong, _receiveBuffer, 3);
+        _parseInt(&_readValueElement, _receiveBuffer, 4);
+        _readValueFloat = 0;
+        _xplInboundHandler(tHandle);
+        break;
 
-		
-		case XPLCMD_DATAREFUPDATEINT :
-		
-			_parseInt(&tHandle, _receiveBuffer, 2);
-			_parseInt(&readValueLong, _receiveBuffer, 3);
-			readValueElement = 0;
-			_xplInboundHandler(tHandle);
-			break;
+    // float dataref received
+    case XPLCMD_DATAREFUPDATEFLOAT:
+        _parseInt(&tHandle, _receiveBuffer, 2);
+        _parseFloat(&_readValueFloat, _receiveBuffer, 3);
+        _readValueLong = 0;
+        _readValueElement = 0;
+        _xplInboundHandler(tHandle);
+        break;
 
-		case XPLCMD_DATAREFUPDATEINTARRAY:
+    // float array dataref received
+    case XPLCMD_DATAREFUPDATEFLOATARRAY:
+        _parseInt(&tHandle, _receiveBuffer, 2);
+        _parseFloat(&_readValueFloat, _receiveBuffer, 3);
+        _parseInt(&_readValueElement, _receiveBuffer, 4);
+        _readValueLong = 0;
+        _xplInboundHandler(tHandle);
+        break;
 
-			_parseInt(&tHandle, _receiveBuffer, 2);
-			_parseInt(&readValueLong, _receiveBuffer, 3);
-			_parseInt(&readValueElement, _receiveBuffer, 4);
-			_xplInboundHandler(tHandle);
-			break;
+    // obsolete?            reserve for the time being...
+  //  case XPLREQUEST_REFRESH:
+  //      break;
 
-		case XPLCMD_DATAREFUPDATEFLOAT:
-
-			_parseInt(&tHandle, _receiveBuffer, 2);
-			_parseFloat(&readValueFloat, _receiveBuffer, 3);
-			_xplInboundHandler(tHandle);
-			break;
-		
-		case XPLCMD_DATAREFUPDATEFLOATARRAY:
-
-			_parseInt(&tHandle, _receiveBuffer, 2);
-			_parseFloat(&readValueFloat, _receiveBuffer, 3);
-			_parseInt(&readValueElement, _receiveBuffer, 4);
-			_xplInboundHandler(tHandle);
-			break;
-	
-		case XPLREQUEST_REFRESH:
-			break;
-		
-
-		
-		default:
-		
-			
-			break;
-		
-
-	}
-
-	_receiveBuffer[0] = 0;
+    default:
+        break;
+    }
+    // empty receive buffer
+    _receiveBuffer[0] = 0;
 }
 
-
-void XPLPro::_sendPacketVoid(int command, int handle)			// just a command with a handle
+void XPLPro::_sendPacketVoid(int command, int handle) // just a command with a handle
 {
-	if (handle < 0) return;
-
-	sprintf(_sendBuffer, "%c%c,%i%c", XPL_PACKETHEADER, command, handle, XPL_PACKETTRAILER);
-  
-  _transmitPacket();
+    // check for valid handle
+    if (handle < 0)
+    {
+        return;
+    }
+    sprintf(_sendBuffer, "%c%c,%i%c", XPL_PACKETHEADER, command, handle, XPL_PACKETTRAILER);
+    _transmitPacket();
 }
 
-void XPLPro::_sendPacketString(int command, const char *str)			// for a string
+void XPLPro::_sendPacketString(int command, const char *str) // for a string
 {
-	
-	
-	sprintf(_sendBuffer, "%c%c,\"%s\"%c", XPL_PACKETHEADER, command, str, XPL_PACKETTRAILER);
-
-	_transmitPacket();
+    sprintf(_sendBuffer, "%c%c,\"%s\"%c", XPL_PACKETHEADER, command, str, XPL_PACKETTRAILER);
+    _transmitPacket();
 }
-
 
 void XPLPro::_transmitPacket(void)
 {
-	
-	streamPtr->write(_sendBuffer);
-	if (strlen(_sendBuffer) == 64) streamPtr->print(" ");			// apparantly a bug in arduino with some boards when we transmit exactly 64 bytes.  That took a while to track down...
-
+    _streamPtr->write(_sendBuffer);
+    if (strlen(_sendBuffer) == 64)
+    {
+        // apparently a bug in arduino with some boards when we transmit exactly 64 bytes. That took a while to track down...
+        _streamPtr->print(" ");
+    }
 }
 
-
-int XPLPro::_parseString(char* outBuffer, char* inBuffer, int parameter, int maxSize)
+int XPLPro::_parseString(char *outBuffer, char *inBuffer, int parameter, int maxSize)// todo:  Confirm 0 length strings ("") dont cause issues
 {
-	int cBeg;
-	int pos = 0;
-	int len;
+    int cBeg;
+    int pos = 0;
+    int len;
 
-	for (int i = 1; i < parameter; i++)
-	{
+    for (int i = 1; i < parameter; i++)
+    {
+        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
+        {
+            pos++;
+        }
+        pos++;
+    }
 
-		while (inBuffer[pos] != ',' && inBuffer[pos] != NULL) pos++;
-		pos++;
+    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0)
+    {
+        pos++;
+    }
+    cBeg = ++pos;
 
-	}
-
-	while (inBuffer[pos] != '\"' && inBuffer[pos] != NULL) pos++;
-	cBeg = ++pos;
-
-	while (inBuffer[pos] != '\"' && inBuffer[pos] != NULL) pos++;
-	len = pos - cBeg;
-	if (len > maxSize) len = maxSize;
-
-
-	strncpy(outBuffer, (char*)&inBuffer[cBeg], len);
-	outBuffer[len] = 0;
-	//fprintf(errlog, "_parseString, pos: %i, cBeg: %i, deviceName: %s\n", pos, cBeg, target);
-
-	return 0;
+    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0)
+    {
+        pos++;
+    }
+    len = pos - cBeg;
+    if (len > maxSize)
+    {
+        len = maxSize;
+    }
+    strncpy(outBuffer, (char *)&inBuffer[cBeg], len);
+    outBuffer[len] = 0;
+    // fprintf(errlog, "_parseString, pos: %i, cBeg: %i, deviceName: %s\n", pos, cBeg, target);
+    return 0;
 }
 
-int XPLPro::_parseInt(int* outTarget, char* inBuffer, int parameter)
+int XPLPro::_parseInt(int *outTarget, char *inBuffer, int parameter)
 {
-	int cBeg;
-	int pos = 0;
-
-	for (int i = 1; i < parameter; i++)
-	{
-
-		while (inBuffer[pos] != ',' && inBuffer[pos] != NULL) pos++;
-		pos++;
-
-	}
-	cBeg = pos;
-
-	while (inBuffer[pos] != ',' && inBuffer[pos] != NULL && inBuffer[pos] != XPL_PACKETTRAILER) pos++;
-
-	char holdChar = inBuffer[pos];
-	inBuffer[pos] = 0;
-	*outTarget = atoi((char*)&inBuffer[cBeg]);
-		
-	inBuffer[pos] = holdChar;
-
-	return 0;
-
+    int cBeg;
+    int pos = 0;
+    // search for the selected parameter
+    for (int i = 1; i < parameter; i++)
+    {
+        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
+        {
+            pos++;
+        }
+        pos++;
+    }
+    // parameter starts here
+    cBeg = pos;
+    // search for end of parameter
+    while (inBuffer[pos] != ',' && inBuffer[pos] != 0 && inBuffer[pos] != XPL_PACKETTRAILER)
+    {
+        pos++;
+    }
+    // temporarily make parameter null terminated
+    char holdChar = inBuffer[pos];
+    inBuffer[pos] = 0;
+    // get integer value from string
+    *outTarget = atoi((char *)&inBuffer[cBeg]);
+    // restore buffer
+    inBuffer[pos] = holdChar;
+    return 0;
 }
 
-int XPLPro::_parseInt(long int* outTarget, char* inBuffer, int parameter)
+int XPLPro::_parseInt(long *outTarget, char *inBuffer, int parameter)
 {
-	int cBeg;
-	int pos = 0;
-
-	for (int i = 1; i < parameter; i++)
-	{
-
-		while (inBuffer[pos] != ',' && inBuffer[pos] != NULL) pos++;
-		pos++;
-
-	}
-	cBeg = pos;
-
-	while (inBuffer[pos] != ',' && inBuffer[pos] != NULL && inBuffer[pos] != XPL_PACKETTRAILER) pos++;
-
-	char holdChar = inBuffer[pos];
-	inBuffer[pos] = 0;
-	*outTarget = atoi((char*)&inBuffer[cBeg]);
-
-	inBuffer[pos] = holdChar;
-
-	return 0;
-
+    int cBeg;
+    int pos = 0;
+    for (int i = 1; i < parameter; i++)
+    {
+        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
+        {
+            pos++;
+        }
+        pos++;
+    }
+    cBeg = pos;
+    while (inBuffer[pos] != ',' && inBuffer[pos] != 0 && inBuffer[pos] != XPL_PACKETTRAILER)
+    {
+        pos++;
+    }
+    char holdChar = inBuffer[pos];
+    inBuffer[pos] = 0;
+    *outTarget = atoi((char *)&inBuffer[cBeg]);
+    inBuffer[pos] = holdChar;
+    return 0;
 }
 
-int XPLPro::_parseFloat(float* outTarget, char* inBuffer, int parameter)
+int XPLPro::_parseFloat(float *outTarget, char *inBuffer, int parameter)
 {
-	int cBeg;
-	int pos = 0;
-
-	for (int i = 1; i < parameter; i++)
-	{
-
-		while (inBuffer[pos] != ',' && inBuffer[pos] != NULL) pos++;
-		pos++;
-
-	}
-	cBeg = pos;
-
-	while (inBuffer[pos] != ',' && inBuffer[pos] != NULL && inBuffer[pos] != XPL_PACKETTRAILER) pos++;
-
-	char holdChar = inBuffer[pos];
-	inBuffer[pos] = 0;
-	*outTarget = atof((char*)&inBuffer[cBeg]);
-
-	inBuffer[pos] = holdChar;
-
-	return 0;
-
+    int cBeg;
+    int pos = 0;
+    for (int i = 1; i < parameter; i++)
+    {
+        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
+        {
+            pos++;
+        }
+        pos++;
+    }
+    cBeg = pos;
+    while (inBuffer[pos] != ',' && inBuffer[pos] != 0 && inBuffer[pos] != XPL_PACKETTRAILER)
+    {
+        pos++;
+    }
+    char holdChar = inBuffer[pos];
+    inBuffer[pos] = 0;
+    *outTarget = atof((char *)&inBuffer[cBeg]);
+    inBuffer[pos] = holdChar;
+    return 0;
 }
 
-
-
-
-
-
-#ifdef XPL_USE_PROGMEM
-int XPLPro::registerDataRef(const __FlashStringHelper* datarefName)
+int XPLPro::registerDataRef(XPString_t *datarefName)
 {
-	long int startTime;
+    long int startTime;
 
-	if (!_registerFlag) return -1;
-
-	sprintf(_sendBuffer, "%c%c,\"%S\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERDATAREF, datarefName, XPL_PACKETTRAILER);
-	_transmitPacket();
-
-	_handleAssignment = -1;
-	startTime = millis();					// for timeout function
-
-	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment < 0)
-		_processSerial();
-
-	return _handleAssignment;
-
-}
-
+    // registration only allowed in callback (TODO: is this limitation really necessary?)
+    if (!_registerFlag)
+    {
+        return XPL_HANDLE_INVALID;
+    }
+#if XPL_USE_PROGMEM
+    sprintf(_sendBuffer, "%c%c,\"%S\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERDATAREF, (wchar_t *)datarefName, XPL_PACKETTRAILER);
+#else
+    sprintf(_sendBuffer, "%c%c,\"%s\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERDATAREF, (char *)datarefName, XPL_PACKETTRAILER);
 #endif
+    _transmitPacket();
 
-int XPLPro::registerDataRef(const char* datarefName)
-{
-	long int startTime;
+    _handleAssignment = XPL_HANDLE_INVALID;
+    startTime = millis(); // for timeout function
 
-	if (!_registerFlag) return -1;
+    while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment < 0)
+        _processSerial();
 
-	sprintf(_sendBuffer, "%c%c,\"%s\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERDATAREF, datarefName, XPL_PACKETTRAILER);
-	_transmitPacket();
-
-	_handleAssignment = -1;
-	startTime = millis();					// for timeout function
-	
-	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment<0 )
-		_processSerial();
-		
-	return _handleAssignment;
-	
-
-	
+    return _handleAssignment;
 }
 
-
-
-#ifdef XPL_USE_PROGMEM
-int XPLPro::registerCommand(const __FlashStringHelper* commandName)		// user will trigger commands with commandTrigger
+int XPLPro::registerCommand(XPString_t *commandName)
 {
-
-	long int startTime;
-
-	startTime = millis();					// for timeout function
-
-	sprintf(_sendBuffer, "%c%c,\"%S\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERCOMMAND, commandName, XPL_PACKETTRAILER);
-	_transmitPacket();
-
-	_handleAssignment = -1;
-
-	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment < 0)
-		_processSerial();
-
-	return _handleAssignment;
-
-	
-}
+    long int startTime = millis(); // for timeout function
+#if XPL_USE_PROGMEM
+    sprintf(_sendBuffer, "%c%c,\"%S\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERCOMMAND, (wchar_t *)commandName, XPL_PACKETTRAILER);
+#else
+    sprintf(_sendBuffer, "%c%c,\"%s\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERCOMMAND, (char *)commandName, XPL_PACKETTRAILER);
 #endif
-
-int XPLPro::registerCommand(const char* commandName)		// user will trigger commands with commandTrigger
-{
-
-	long int startTime;
-
-	startTime = millis();					// for timeout function
-
-	sprintf(_sendBuffer, "%c%c,\"%s\"%c", XPL_PACKETHEADER, XPLREQUEST_REGISTERCOMMAND, commandName, XPL_PACKETTRAILER);
-	_transmitPacket();
-
-	_handleAssignment = -1;
-
-	while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment<0)
-		_processSerial();
-
-	return _handleAssignment;
-	
-	
-	
+    _transmitPacket();
+    _handleAssignment = XPL_HANDLE_INVALID;
+    while (millis() - startTime < XPL_RESPONSE_TIMEOUT && _handleAssignment < 0)
+    {
+        _processSerial();
+    }
+    return _handleAssignment;
 }
 
 void XPLPro::requestUpdates(int handle, int rate, float precision)
 {
-	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer?
-	dtostrf(precision, 0, XPL_FLOATPRECISION, tBuf);
-
-	sprintf(_sendBuffer, "%c%c,%i,%i,%s%c",
-		XPL_PACKETHEADER,
-		XPLREQUEST_UPDATES,
-		handle,
-		rate,
-		tBuf,
-		XPL_PACKETTRAILER);
-
-	_transmitPacket();
+    char tBuf[20]; // todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer?
+    dtostrf(precision, 0, XPL_FLOATPRECISION, tBuf);
+    sprintf(_sendBuffer, "%c%c,%i,%i,%s%c",
+            XPL_PACKETHEADER,
+            XPLREQUEST_UPDATES,
+            handle,
+            rate,
+            tBuf,
+            XPL_PACKETTRAILER);
+    _transmitPacket();
 }
 
 void XPLPro::requestUpdates(int handle, int rate, float precision, int element)
 {
-	char tBuf[20];							//todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer?
-	dtostrf(precision, 0, XPL_FLOATPRECISION, tBuf);
-
-	sprintf(_sendBuffer, "%c%c,%i,%i,%s,%i%c",
-		XPL_PACKETHEADER,
-		XPLREQUEST_UPDATESARRAY,
-		handle,
-		rate,
-		tBuf,
-		element,
-		XPL_PACKETTRAILER);
-
-	_transmitPacket();
+    char tBuf[20]; // todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer?
+    dtostrf(precision, 0, XPL_FLOATPRECISION, tBuf);
+    sprintf(_sendBuffer, "%c%c,%i,%i,%s,%i%c",
+            XPL_PACKETHEADER,
+            XPLREQUEST_UPDATESARRAY,
+            handle,
+            rate,
+            tBuf,
+            element,
+            XPL_PACKETTRAILER);
+    _transmitPacket();
 }
 
 void XPLPro::setScaling(int handle, int inLow, int inHigh, int outLow, int outHigh)
 {
-	
-	sprintf(_sendBuffer, "%c%c,%i,%i,%i,%i,%i%c",
-		XPL_PACKETHEADER,
-		XPLREQUEST_SCALING,
-		handle,
-		inLow,
-		inHigh,
-		outLow,
-		outHigh,
-		XPL_PACKETTRAILER);
-
-	_transmitPacket();
+    sprintf(_sendBuffer, "%c%c,%i,%i,%i,%i,%i%c",
+            XPL_PACKETHEADER,
+            XPLREQUEST_SCALING,
+            handle,
+            inLow,
+            inHigh,
+            outLow,
+            outHigh,
+            XPL_PACKETTRAILER);
+    _transmitPacket();
 }
