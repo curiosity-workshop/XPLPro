@@ -168,32 +168,32 @@ void loop()
 void inboundHandler(int handle)
 {
   if (handle == drefBeacon)
-  {   if (XP.readValueLong)   digitalWrite(LED_BUILTIN, HIGH);        // if beacon is on set the builtin led on
+  {   if (XP.datarefReadInt())   digitalWrite(LED_BUILTIN, HIGH);        // if beacon is on set the builtin led on
       else                    digitalWrite(LED_BUILTIN, LOW);
   }
 
   if (handle == drefEngineRPM)                      // display RPM on the LCD
   {   lcd.setCursor(0,1);
       lcd.print("Alt: ");
-      lcd.print((int)XP.readValueFloat);            // casted to INT to remove decimals
+      lcd.print((int)XP.datarefReadFloat());            // casted to INT to remove decimals
   }
 
 /*
  * This reads the status of the landing gear.  You could turn on lights as in this example.  The position is represented as a float between 0 and 1, 1 representing down and locked.
  */
   if (handle == drefGearDeployed)
-  { switch (XP.readValueElement)
+  { switch (XP.datarefReadElement() )
     {
       case 0:     // nose gear
-        if (XP.readValueFloat == 1)    digitalWrite(PIN_NOSEGEARLED, HIGH);   else digitalWrite(PIN_NOSEGEARLED, LOW);
+        if (XP.datarefReadFloat() == 1)    digitalWrite(PIN_NOSEGEARLED, HIGH);   else digitalWrite(PIN_NOSEGEARLED, LOW);
         break;
 
       case 1:     // Left Main 
-        if (XP.readValueFloat == 1)    digitalWrite(PIN_LEFTGEARLED, HIGH);   else digitalWrite(PIN_LEFTGEARLED, LOW);   
+        if (XP.datarefReadFloat() == 1)    digitalWrite(PIN_LEFTGEARLED, HIGH);   else digitalWrite(PIN_LEFTGEARLED, LOW);   
         break;
 
       case 2:     // Right Main
-        if (XP.readValueFloat == 1)    digitalWrite(PIN_RIGHTGEARLED, HIGH);  else digitalWrite(PIN_RIGHTGEARLED, LOW);   
+        if (XP.datarefReadFloat() == 1)    digitalWrite(PIN_RIGHTGEARLED, HIGH);  else digitalWrite(PIN_RIGHTGEARLED, LOW);   
         break;
   
     }
@@ -211,9 +211,10 @@ void registerXplaneStuff()          // this is the function we set as a callback
 /*
  * This example registers a dataref for the beacon light.  
  * In the loop section of the code we will turn on/off the LED on the arduino board to represent the status of the beacon light within xplane.
+ * On non-AVR boards remove the F() macro.
  * 
  */
-  drefBeacon = XP.registerDataRef("sim/cockpit2/switches/beacon_on");    
+  drefBeacon = XP.registerDataRef(F("sim/cockpit2/switches/beacon_on") );    
   XP.requestUpdates(drefBeacon, 100, 0);          // Tell xplane to send us updates when the status of the beacon light changes.  
                                                   // 100 means don't update more often than every 100ms and 0 is a resolution divider which is explained in another dataref, use 0 if no divider required
   
@@ -226,7 +227,7 @@ void registerXplaneStuff()          // this is the function we set as a callback
  * In the loop section of the code we will check the status of the switch send it to the navLight dataref within Xplane.
  * To test this, connect one side of a normal toggle switch to ground and the other to the pin used in the #define for PIN_NAVLIGHT (9)
  */
-  drefNavLight = XP.registerDataRef("sim/cockpit/electrical/nav_lights_on");    
+  drefNavLight = XP.registerDataRef(F("sim/cockpit/electrical/nav_lights_on") );    
  
   
 /*
@@ -239,32 +240,23 @@ void registerXplaneStuff()          // this is the function we set as a callback
  * 
  * This comes preset in the distrubution version of the abbreviations.txt file so we will try it in the example:
  */
-  drefLdgLight = XP.registerDataRef("LTland");    // "LTland" will be converted to "sim/cockpit/electrical/landing_lights_on"
-
-
-/* Another way to save RAM on AVR boards such as the NANO and the UNO and the MEGA is to use the F() macro to store the string in flash memory rather than RAM.  
- *  
- *  Most non AVR boards don't support this so remove the F() macro if it won't compile.
- *  
- *   
- */
- 
-   drefTaxiLight = XP.registerDataRef(F("sim/cockpit2/switches/taxi_light_on"));
+  drefLdgLight = XP.registerDataRef(F("LTland") );    // "LTland" will be converted to "sim/cockpit/electrical/landing_lights_on"
+  drefTaxiLight = XP.registerDataRef(F("LTTaxi"));
 
    
 /*
  * more examples for the testing box
  */
-  drefGearDeployed = XP.registerDataRef("sim/flightmodel2/gear/deploy_ratio");            // this will be updated from xplane to tell us what position the landing gear is in
+  drefGearDeployed = XP.registerDataRef(F("sim/flightmodel2/gear/deploy_ratio") );            // this will be updated from xplane to tell us what position the landing gear is in
   XP.requestUpdates(drefGearDeployed, 100, 1, 0);          // Tell xplane to send us updates when the status of the gear position changes.  
   XP.requestUpdates(drefGearDeployed, 100, 1, 1);          // 100 means don't update more often than every 100ms and .1 is a resolution divider to reduce data flow.  eg we probably arent interested in .001 of gear position.
   XP.requestUpdates(drefGearDeployed, 100, 1, 2);          // The additional parameter is the array element to reference, since this dataref is an array of values.  0=nose, 1=left, 2=right
     
-  drefThrottle = XP.registerDataRef("sim/cockpit2/engine/actuators/throttle_ratio");      // This is an array dataref.  We will be sending this data from a potentiometer
+  drefThrottle = XP.registerDataRef(F("sim/cockpit2/engine/actuators/throttle_ratio") );      // This is an array dataref.  We will be sending this data from a potentiometer
   XP.setScaling(drefThrottle, 0, 102, 0, 1);                                              // this uses a map style function to convert values 0-102 to a float value of 0-1.  Since analogRead returns 0-1024, we will divide it
                                                                                           // by 10 when we read it then convert 0-102 to a float value of 0-1.
 
-  drefEngineRPM = XP.registerDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot");   // indicated altitude for display on the LCD screen.  This is a float 
+  drefEngineRPM = XP.registerDataRef(F("sim/cockpit2/gauges/indicators/altitude_ft_pilot") );   // indicated altitude for display on the LCD screen.  This is a float 
   XP.requestUpdates(drefEngineRPM, 100, 10);                                                // divide by 10 to show increments of 10 feet
   
    
@@ -272,9 +264,9 @@ void registerXplaneStuff()          // this is the function we set as a callback
  * Now register commands.  
  * 
  */
-  cmdPause       = XP.registerCommand("sim/operation/pause_toggle");
-  cmdToga        = XP.registerCommand("sim/autopilot/take_off_go_around");
-  cmdGearToggle  = XP.registerCommand("sim/flight_controls/landing_gear_toggle");
+  cmdPause       = XP.registerCommand(F("sim/operation/pause_toggle") );
+  cmdToga        = XP.registerCommand(F("sim/autopilot/take_off_go_around") );
+  cmdGearToggle  = XP.registerCommand(F("sim/flight_controls/landing_gear_toggle") );
 
   
 }
