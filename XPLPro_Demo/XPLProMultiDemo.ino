@@ -165,35 +165,35 @@ void loop()
  * readValueFloat       If the dataref is of type FLOAT
  * readValueElement     If the dataref is an array, this is the element that changed
  */
-void inboundHandler(int handle)
+void inboundHandler(inStruct *inData)
 {
-  if (handle == drefBeacon)
-  {   if (XP.datarefReadInt())   digitalWrite(LED_BUILTIN, HIGH);        // if beacon is on set the builtin led on
+  if (inData->handle == drefBeacon)
+  {   if (inData->inLong)   digitalWrite(LED_BUILTIN, HIGH);        // if beacon is on set the builtin led on
       else                    digitalWrite(LED_BUILTIN, LOW);
   }
 
-  if (handle == drefEngineRPM)                      // display RPM on the LCD
+  if (inData->handle == drefEngineRPM)                      // display RPM on the LCD
   {   lcd.setCursor(0,1);
       lcd.print("Alt: ");
-      lcd.print((int)XP.datarefReadFloat());            // casted to INT to remove decimals
+      lcd.print((int)inData->inFloat);            // casted to INT to remove decimals
   }
 
 /*
  * This reads the status of the landing gear.  You could turn on lights as in this example.  The position is represented as a float between 0 and 1, 1 representing down and locked.
  */
-  if (handle == drefGearDeployed)
-  { switch (XP.datarefReadElement() )
+  if (inData->handle == drefGearDeployed)
+  { switch (inData->element )
     {
       case 0:     // nose gear
-        if (XP.datarefReadFloat() == 1)    digitalWrite(PIN_NOSEGEARLED, HIGH);   else digitalWrite(PIN_NOSEGEARLED, LOW);
+        if (inData->inFloat == 1)    digitalWrite(PIN_NOSEGEARLED, HIGH);   else digitalWrite(PIN_NOSEGEARLED, LOW);
         break;
 
       case 1:     // Left Main 
-        if (XP.datarefReadFloat() == 1)    digitalWrite(PIN_LEFTGEARLED, HIGH);   else digitalWrite(PIN_LEFTGEARLED, LOW);   
+        if (inData->inFloat == 1)    digitalWrite(PIN_LEFTGEARLED, HIGH);   else digitalWrite(PIN_LEFTGEARLED, LOW);   
         break;
 
       case 2:     // Right Main
-        if (XP.datarefReadFloat() == 1)    digitalWrite(PIN_RIGHTGEARLED, HIGH);  else digitalWrite(PIN_RIGHTGEARLED, LOW);   
+        if (inData->inFloat == 1)    digitalWrite(PIN_RIGHTGEARLED, HIGH);  else digitalWrite(PIN_RIGHTGEARLED, LOW);   
         break;
   
     }
@@ -241,7 +241,7 @@ void registerXplaneStuff()          // this is the function we set as a callback
  * This comes preset in the distrubution version of the abbreviations.txt file so we will try it in the example:
  */
   drefLdgLight = XP.registerDataRef(F("LTland") );    // "LTland" will be converted to "sim/cockpit/electrical/landing_lights_on"
-  drefTaxiLight = XP.registerDataRef(F("LTTaxi"));
+  drefTaxiLight = XP.registerDataRef(F("LTtaxi"));
 
    
 /*
