@@ -8,7 +8,7 @@ XPLPro::XPLPro(Stream *device)
     _streamPtr->setTimeout(XPL_RX_TIMEOUT);
 }
 
-void XPLPro::begin(const char *devicename, void (*initFunction)(void), void (*stopFunction)(void), void (*inboundHandler)(int))
+void XPLPro::begin(const char *devicename, void (*initFunction)(void), void (*stopFunction)(void), void (*inboundHandler)(inStruct *))
 {
     _deviceName = (char *)devicename;
     _connectionStatus = 0;
@@ -80,6 +80,17 @@ int XPLPro::sendSpeakMessage(const char *msg)
 {
     _sendPacketString(XPLCMD_SPEAK, msg);
     return 1;
+}
+
+void XPLPro::flightLoopPause(void)              // experimental!  Do not use!
+{
+    _sendPacketVoid(XPLCMD_FLIGHTLOOPPAUSE, 0);
+
+}
+
+void XPLPro::flightLoopResume(void)
+{
+    _sendPacketVoid(XPLCMD_FLIGHTLOOPRESUME, 0);
 }
 
 // these could be done better:
@@ -206,7 +217,7 @@ void XPLPro::_processSerial()
 
 void XPLPro::_processPacket()
 {
-    int tHandle;
+   
     // check whether we have a valid frame
     if (_receiveBuffer[0] != XPL_PACKETHEADER)
     {
@@ -245,39 +256,43 @@ void XPLPro::_processPacket()
 
     // int dataref received
     case XPLCMD_DATAREFUPDATEINT:
-        _parseInt(&tHandle, _receiveBuffer, 2);
-        _parseInt(&_readValueLong, _receiveBuffer, 3);
-        _readValueFloat = 0;
-        _readValueElement = 0;
-        _xplInboundHandler(tHandle);
+        _parseInt(&_inData.handle, _receiveBuffer, 2);
+        _parseInt(&_inData.inLong, _receiveBuffer, 3);
+        _inData.inFloat = 0;
+        _inData.element = 0;
+        _xplInboundHandler(&_inData);
         break;
 
     // int array dataref received
     case XPLCMD_DATAREFUPDATEINTARRAY:
-        _parseInt(&tHandle, _receiveBuffer, 2);
-        _parseInt(&_readValueLong, _receiveBuffer, 3);
-        _parseInt(&_readValueElement, _receiveBuffer, 4);
-        _readValueFloat = 0;
-        _xplInboundHandler(tHandle);
+        _parseInt(&_inData.handle, _receiveBuffer, 2);
+        _parseInt(&_inData.inLong, _receiveBuffer, 3);
+        _parseInt(&_inData.element, _receiveBuffer, 4);
+        _inData.inFloat = 0;
+        _xplInboundHandler(&_inData);
         break;
 
     // float dataref received
     case XPLCMD_DATAREFUPDATEFLOAT:
-        _parseInt(&tHandle, _receiveBuffer, 2);
-        _parseFloat(&_readValueFloat, _receiveBuffer, 3);
-        _readValueLong = 0;
-        _readValueElement = 0;
-        _xplInboundHandler(tHandle);
+        _parseInt(&_inData.handle, _receiveBuffer, 2);
+        _parseFloat(&_inData.inFloat, _receiveBuffer, 3);
+        _inData.inLong = 0;
+        _inData.element = 0;
+        _xplInboundHandler(&_inData);
         break;
 
     // float array dataref received
     case XPLCMD_DATAREFUPDATEFLOATARRAY:
-        _parseInt(&tHandle, _receiveBuffer, 2);
-        _parseFloat(&_readValueFloat, _receiveBuffer, 3);
-        _parseInt(&_readValueElement, _receiveBuffer, 4);
-        _readValueLong = 0;
-        _xplInboundHandler(tHandle);
+        _parseInt(&_inData.handle, _receiveBuffer, 2);
+        _parseFloat(&_inData.inFloat, _receiveBuffer, 3);
+        _parseInt(&_inData.element, _receiveBuffer, 4);
+        _inData.inLong = 0;
+        _xplInboundHandler(&_inData);
         break;
+   
+        // Todo:  Still need to deal with inbound strings
+        // Todo:  implement type within struct
+        
 
     // obsolete?            reserve for the time being...
   //  case XPLREQUEST_REFRESH:

@@ -78,6 +78,8 @@ typedef const char XPString_t;
 #define XPLCMD_SENDNAME 'N'                // plugin request name from arduino
 #define XPLRESPONSE_NAME 'n'               // Arduino responds with device name as initialized in the "begin" function
 #define XPLCMD_SENDREQUEST 'Q'             // plugin sends this when it is ready to register bindings
+#define XPLCMD_FLIGHTLOOPPAUSE	    'p'		// stop flight loop while we register
+#define XPLCMD_FLIGHTLOOPRESUME  	'q'		// 
 #define XPLREQUEST_REGISTERDATAREF 'b'     // Register a dataref
 #define XPLREQUEST_REGISTERCOMMAND 'm'     // Register a command
 #define XPLRESPONSE_DATAREF 'D'            // Plugin responds with handle to dataref or - value if not found.  dataref handle, dataref name
@@ -100,6 +102,16 @@ typedef const char XPString_t;
 #define XPLCMD_COMMANDEND 'j'              // End command (Button released)
 #define XPL_EXITING 'X'                    // XPlane sends this to the arduino device during normal shutdown of XPlane. It may not happen if xplane crashes.
 
+struct inStruct // potentially 'class'
+{
+    int handle;
+    int type;
+    int element;
+    long inLong;
+    float inFloat;
+    char* inStr;
+};
+
 /// @brief Core class for the XPLPro Arduino library
 class XPLPro
 {
@@ -113,7 +125,7 @@ public:
     /// @param initFunction Callback for DataRef and Command registration
     /// @param stopFunction Callback for XPlane shutdown or plane change
     /// @param inboundHandler Callback for incoming DataRefs
-    void begin(const char *devicename, void (*initFunction)(void), void (*stopFunction)(void), void (*inboundHandler)(int));
+    void begin(const char *devicename, void (*initFunction)(void), void (*stopFunction)(void), void (*inboundHandler)(inStruct *));
 
     /// @brief Return connection status
     /// @return True if connection to XPlane established
@@ -199,18 +211,7 @@ public:
     /// @return Assigned handle for the Command, -1 if Command was not found
     int registerCommand(XPString_t *commandName);
 
-    /// @brief Read the received float DataRef
-    /// @return Received value
-    float datarefReadFloat() { return _readValueFloat; }
-
-    /// @brief Read the received integer DataRef
-    /// @return Received value
-    long datarefReadInt() { return _readValueLong; }
-
-    /// @brief Read the received array element
-    /// @return Received array element
-    int datarefReadElement() { return _readValueElement; }
-
+    
     /// @brief Send a debug message to the plugin
     /// @param msg Message to show as debug string
     /// @return
@@ -224,10 +225,15 @@ public:
     /// @brief Request a reset from the plugin
     void sendResetRequest(void);
 
+    void flightLoopPause(void);
+    void flightLoopResume(void);
+
     /// @brief Cyclic loop handler, must be called in idle task
     /// @return Connection status
     int xloop();
 
+    
+    
 private:
     void _processSerial();
     void _processPacket();
@@ -244,6 +250,7 @@ private:
     const char *_deviceName;
     byte _registerFlag;
     byte _connectionStatus;
+    inStruct _inData;
 
     char _sendBuffer[XPLMAX_PACKETSIZE_TRANSMIT];
     char _receiveBuffer[XPLMAX_PACKETSIZE_RECEIVE];
@@ -251,12 +258,10 @@ private:
 
     void (*_xplInitFunction)(void);  // this function will be called when the plugin is ready to receive binding requests
     void (*_xplStopFunction)(void);  // this function will be called with the plugin receives message or detects xplane flight model inactive
-    void (*_xplInboundHandler)(int); // this function will be called when the plugin sends dataref values
+    void (*_xplInboundHandler)(inStruct *); // this function will be called when the plugin sends dataref values
 
     int _handleAssignment;
-    long _readValueLong;
-    float _readValueFloat;
-    int _readValueElement;
+ 
 };
 
 #endif
