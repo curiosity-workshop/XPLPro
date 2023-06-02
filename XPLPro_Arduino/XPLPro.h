@@ -11,9 +11,9 @@
 #include <Arduino.h>
 
 
-//////////////////////////////////////////////////////////////
+//==============================================================
 // Parameters that can be overwritten by command line defines
-//////////////////////////////////////////////////////////////
+//==============================================================
 
 // Decimals of precision for floating point datarefs. More increases dataflow (default 4)
 #ifndef XPL_FLOATPRECISION
@@ -241,6 +241,7 @@ private:
     void _sendname();
     void _sendPacketVoid(int command, int handle);        // just a command with a handle
     void _sendPacketString(int command, const char *str); // send a string
+    void _seekParm(char* buf, int paramIdx, int& start, int &end);
     int _parseInt(int *outTarget, char *inBuffer, int parameter);
     int _parseInt(long *outTarget, char *inBuffer, int parameter);
     int _parseFloat(float *outTarget, char *inBuffer, int parameter);

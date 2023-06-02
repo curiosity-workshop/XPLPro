@@ -332,36 +332,43 @@ void XPLPro::_transmitPacket(void)
     }
 }
 
-int XPLPro::_parseString(char *outBuffer, char *inBuffer, int parameter, int maxSize)// todo:  Confirm 0 length strings ("") dont cause issues
+void XPLPro::_seekParm(const char* buf, int paramIdx, int& start, int &end)
 {
+    int pos = 0;
+    // search for the selected parameter
+    for (int i = 1; i < paramIdx; i++) {
+        while (buf[pos] != ',' && buf[pos] != 0) pos++;
+        if(buf[pos] != 0)pos++; // skip separator
+    }
+    // parameter starts here
+    start = pos;
+    // search for end of parameter
+    while (buf[pos] != ',' && buf[pos] != 0 && buf[pos] != XPL_PACKETTRAILER) pos++;
+    end = pos;
+}
+
+
+int XPLPro::_parseString(char *outBuffer, char *inBuffer, int parameter, int maxSize)
+{
+    // todo:  Confirm 0 length strings ("") dont cause issues
     int cBeg;
     int pos = 0;
     int len;
 
-    for (int i = 1; i < parameter; i++)
-    {
-        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
-        {
-            pos++;
-        }
-        pos++;
+    for (int i = 1; i < parameter; i++) {
+        while (inBuffer[pos] != ',' && inBuffer[pos] != 0) pos++;
+        if(inBuffer[pos] != 0) pos++;
     }
 
-    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0)
-    {
-        pos++;
-    }
-    cBeg = ++pos;
+    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0) pos++;
+    if(inBuffer[pos] != 0) ++pos;
+    cBeg = pos;
 
-    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0)
-    {
-        pos++;
-    }
+    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0) pos++;
+
     len = pos - cBeg;
-    if (len > maxSize)
-    {
-        len = maxSize;
-    }
+    if (len > maxSize) len = maxSize;
+
     strncpy(outBuffer, (char *)&inBuffer[cBeg], len);
     outBuffer[len] = 0;
     // fprintf(errlog, "_parseString, pos: %i, cBeg: %i, deviceName: %s\n", pos, cBeg, target);
@@ -370,80 +377,37 @@ int XPLPro::_parseString(char *outBuffer, char *inBuffer, int parameter, int max
 
 int XPLPro::_parseInt(int *outTarget, char *inBuffer, int parameter)
 {
-    int cBeg;
-    int pos = 0;
-    // search for the selected parameter
-    for (int i = 1; i < parameter; i++)
-    {
-        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
-        {
-            pos++;
-        }
-        pos++;
-    }
-    // parameter starts here
-    cBeg = pos;
-    // search for end of parameter
-    while (inBuffer[pos] != ',' && inBuffer[pos] != 0 && inBuffer[pos] != XPL_PACKETTRAILER)
-    {
-        pos++;
-    }
+    int cSt, cEnd;
+    _seekParm(inBuffer, parameter, cSt, cEnd);
     // temporarily make parameter null terminated
-    char holdChar = inBuffer[pos];
-    inBuffer[pos] = 0;
+    char holdChar = inBuffer[cEnd];
+    inBuffer[cEnd] = 0;
     // get integer value from string
-    *outTarget = atoi((char *)&inBuffer[cBeg]);
+    *outTarget = atoi((char *)&inBuffer[cSt]);
     // restore buffer
-    inBuffer[pos] = holdChar;
+    inBuffer[cEnd] = holdChar;
     return 0;
 }
 
 int XPLPro::_parseInt(long *outTarget, char *inBuffer, int parameter)
 {
-    int cBeg;
-    int pos = 0;
-    for (int i = 1; i < parameter; i++)
-    {
-        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
-        {
-            pos++;
-        }
-        pos++;
-    }
-    cBeg = pos;
-    while (inBuffer[pos] != ',' && inBuffer[pos] != 0 && inBuffer[pos] != XPL_PACKETTRAILER)
-    {
-        pos++;
-    }
-    char holdChar = inBuffer[pos];
-    inBuffer[pos] = 0;
-    *outTarget = atoi((char *)&inBuffer[cBeg]);
-    inBuffer[pos] = holdChar;
+    int cSt, cEnd;
+    _seekParm(inBuffer, parameter, cSt, cEnd);
+    char holdChar = inBuffer[cEnd];
+    inBuffer[cEnd] = 0;
+    *outTarget = atol((char *)&inBuffer[cSt]);
+    inBuffer[cEnd] = holdChar;
     return 0;
 }
 
 int XPLPro::_parseFloat(float *outTarget, char *inBuffer, int parameter)
 {
-    int cBeg;
-    int pos = 0;
-    for (int i = 1; i < parameter; i++)
-    {
-        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
-        {
-            pos++;
-        }
-        pos++;
-    }
-    cBeg = pos;
-    while (inBuffer[pos] != ',' && inBuffer[pos] != 0 && inBuffer[pos] != XPL_PACKETTRAILER)
-    {
-        pos++;
-    }
-    char holdChar = inBuffer[pos];
-    inBuffer[pos] = 0;
-    *outTarget = atof((char *)&inBuffer[cBeg]);
-    inBuffer[pos] = holdChar;
-    return 0;
+    int cSt, cEnd;
+    _seekParm(inBuffer, parameter, cSt, cEnd);
+    char holdChar = inBuffer[cEnd];
+    inBuffer[cEnd] = 0;
+    *outTarget = atof((char *)&inBuffer[cSt]);
+    inBuffer[cEnd] = holdChar;
 }
 
 int XPLPro::registerDataRef(XPString_t *datarefName)
