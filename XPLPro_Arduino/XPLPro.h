@@ -11,9 +11,9 @@
 #include <Arduino.h>
 
 
-//////////////////////////////////////////////////////////////
+//==============================================================
 // Parameters that can be overwritten by command line defines
-//////////////////////////////////////////////////////////////
+//==============================================================
 
 // Decimals of precision for floating point datarefs. More increases dataflow (default 4)
 #ifndef XPL_FLOATPRECISION
