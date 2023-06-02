@@ -395,7 +395,7 @@ int XPLPro::_parseInt(long *outTarget, char *inBuffer, int parameter)
     _seekParm(inBuffer, parameter, cSt, cEnd);
     char holdChar = inBuffer[cEnd];
     inBuffer[cEnd] = 0;
-    *outTarget = atoi((char *)&inBuffer[cSt]);
+    *outTarget = atol((char *)&inBuffer[cSt]);
     inBuffer[cEnd] = holdChar;
     return 0;
 }
