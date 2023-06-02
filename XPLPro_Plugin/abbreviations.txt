@@ -10,4 +10,15 @@ LTnav = sim/cockpit/electrical/nav_lights_on
 LTland = sim/cockpit/electrical/landing_lights_on
 LTstrobe = sim/cockpit/electrical/strobe_lights_on
 LTtaxi = sim/cockpit/electrical/taxi_light_on
+LTtax = sim/cockpit/electrical/taxi_light_on
+LTlnd = sim/cockpit/electrical/landing_lights_on
+LTnav = sim/cockpit/electrical/nav_lights_on
+LTstr = sim/cockpit/electrical/strobe_lights_on
+
 ANmc = sim/cockpit/warnings/annunciators/master_caution
+
+Commands can be abbreviated as well:
+
+CMDpause = sim/operation/pause_toggle
+CMDtoga = sim/autopilot/take_off_go_around
+CMDgearToggle = sim/flight_controls/landing_gear_toggle
