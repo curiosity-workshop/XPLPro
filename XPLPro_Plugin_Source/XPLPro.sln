@@ -1,0 +1,48 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30413.136
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XPLProPlugin", "SimData.vcxproj", "{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{36FDB778-95B3-4BB8-A122-80744B2DAA88}"
+	ProjectSection(SolutionItems) = preProject
+		..\..\..\..\..\..\X-Plane 12\Resources\plugins\XPLPro\abbreviations.txt = ..\..\..\..\..\..\X-Plane 12\Resources\plugins\XPLPro\abbreviations.txt
+		..\..\..\..\..\..\X-Plane 12\Log.txt = ..\..\..\..\..\..\X-Plane 12\Log.txt
+		..\..\My Arduino Sketchbook\libraries\XPLPro\readme.txt = ..\..\My Arduino Sketchbook\libraries\XPLPro\readme.txt
+		..\..\..\..\..\..\X-Plane 12\Resources\plugins\XPLPro\XPLPro.cfg = ..\..\..\..\..\..\X-Plane 12\Resources\plugins\XPLPro\XPLPro.cfg
+		..\..\My Arduino Sketchbook\libraries\XPLPro\XPLPro.cpp = ..\..\My Arduino Sketchbook\libraries\XPLPro\XPLPro.cpp
+		..\..\My Arduino Sketchbook\libraries\XPLPro\XPLPro.h = ..\..\My Arduino Sketchbook\libraries\XPLPro\XPLPro.h
+		..\..\..\..\..\..\X-Plane 12\XPLProError.log = ..\..\..\..\..\..\X-Plane 12\XPLProError.log
+		..\..\..\..\..\..\X-Plane 12\XPLProSerial.log = ..\..\..\..\..\..\X-Plane 12\XPLProSerial.log
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Debug|Win32.ActiveCfg = Release|x64
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Debug|Win32.Build.0 = Release|x64
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Debug|x64.ActiveCfg = Debug|x64
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Debug|x64.Build.0 = Debug|x64
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Debug|x86.ActiveCfg = Debug|Win32
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Release|Win32.ActiveCfg = Release|x64
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Release|Win32.Build.0 = Release|x64
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Release|x64.ActiveCfg = Release|x64
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Release|x64.Build.0 = Release|x64
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Release|x86.ActiveCfg = Release|Win32
+		{A5C93EF2-9EEF-4A23-99ED-B1AC1F167F69}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {751D5454-9CC8-4E22-98C6-9E3A1680E01F}
+	EndGlobalSection
+EndGlobal
