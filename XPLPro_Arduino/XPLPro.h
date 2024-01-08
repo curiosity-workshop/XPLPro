@@ -37,7 +37,7 @@
 #else
 // and off otherwise
 #define XPL_USE_PROGMEM 0
-#include <avr/dtostrf.h>                // this is needed for non-AVR boards to include the dtostrf function
+//#include <avr/dtostrf.h>                // this is needed for non-AVR boards to include the dtostrf function
 
 #endif
 #endif
@@ -109,6 +109,7 @@ struct inStruct // potentially 'class'
     int element;
     long inLong;
     float inFloat;
+    int strLength;      // if string data, length of string data
     char* inStr;
 };
 
@@ -236,6 +237,7 @@ public:
     
 private:
     void _processSerial();
+    int _receiveNSerial(int inSize);
     void _processPacket();
     void _transmitPacket();
     void _sendname();
@@ -246,6 +248,7 @@ private:
     int _parseInt(long *outTarget, char *inBuffer, int parameter);
     int _parseFloat(float *outTarget, char *inBuffer, int parameter);
     int _parseString(char *outBuffer, char *inBuffer, int parameter, int maxSize);
+    char* Xdtostrf(double val, signed char width, unsigned char prec, char* sout);
 
     Stream *_streamPtr;
     const char *_deviceName;

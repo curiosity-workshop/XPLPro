@@ -5,9 +5,9 @@ Curiosity Workshop XPLPro Arduino Library - Library for serial interface to Xpla
   To report problems, download updates and examples, suggest enhancements or get technical support, please visit one of the following:
 
      discord:  https://discord.gg/gzXetjEST4
-     www.patreon.com/curiosityworkshop
-     https://www.youtube.com/channel/UCISdHdJIundC-OSVAEPzQIQ
-   
+     patreon: 	www.patreon.com/curiosityworkshop
+     youtube:	https://www.youtube.com/channel/UCISdHdJIundC-OSVAEPzQIQ
+     facebook:  https://www.facebook.com/curiosity.workshop42
 
   Please support this project in one of the following ways:
 
@@ -21,3 +21,9 @@ Known issues:
 
     Remember to close your serial monitor if it is open, it will tie up the serial port and your device won't be found.
 
+Updates:
+
+    16 May 2023:  
+        --  When sending data to the plugin long ints were converted to ints in some cases.  This has been resolved.
+        
+        -- Additional examples added.

@@ -142,7 +142,7 @@ void XPLPro::datarefWrite(int handle, float value)
         return;
     }
     char tBuf[20]; // todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
-    dtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
+    Xdtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
     sprintf(_sendBuffer, "%c%c,%i,%s%c",
             XPL_PACKETHEADER,
             XPLCMD_DATAREFUPDATEFLOAT,
@@ -159,7 +159,7 @@ void XPLPro::datarefWrite(int handle, float value, int arrayElement)
         return;
     }
     char tBuf[20]; // todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
-    dtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
+    Xdtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
     sprintf(_sendBuffer, "%c%c,%i,%s,%i%c",
             XPL_PACKETHEADER,
             XPLCMD_DATAREFUPDATEFLOATARRAY,
@@ -215,6 +215,13 @@ void XPLPro::_processSerial()
     _processPacket();
 }
 
+int XPLPro::_receiveNSerial(int inSize)
+{
+    if (inSize > XPLMAX_PACKETSIZE_RECEIVE) inSize = XPLMAX_PACKETSIZE_RECEIVE;
+
+    return Serial.readBytes(_receiveBuffer, inSize);
+}
+
 void XPLPro::_processPacket()
 {
    
@@ -223,7 +230,7 @@ void XPLPro::_processPacket()
     {
         return;
     }
-    // branch on receiverd command
+    // branch on received command
     switch (_receiveBuffer[1])
     {
     // plane unloaded or XP exiting
@@ -290,8 +297,14 @@ void XPLPro::_processPacket()
         _xplInboundHandler(&_inData);
         break;
    
-        // Todo:  Still need to deal with inbound strings
-        // Todo:  implement type within struct
+    case XPLCMD_DATAREFUPDATESTRING:
+        _parseInt(&_inData.handle, _receiveBuffer, 2);
+        _parseInt(&_inData.strLength, _receiveBuffer, 3);
+        _receiveNSerial(_inData.strLength);
+        _inData.inStr = _receiveBuffer;
+        
+        _xplInboundHandler(&_inData);
+        break;
         
 
     // obsolete?            reserve for the time being...
@@ -332,22 +345,6 @@ void XPLPro::_transmitPacket(void)
     }
 }
 
-void XPLPro::_seekParm(const char* buf, int paramIdx, int& start, int &end)
-{
-    int pos = 0;
-    // search for the selected parameter
-    for (int i = 1; i < paramIdx; i++) {
-        while (buf[pos] != ',' && buf[pos] != 0) pos++;
-        if(buf[pos] != 0)pos++; // skip separator
-    }
-    // parameter starts here
-    start = pos;
-    // search for end of parameter
-    while (buf[pos] != ',' && buf[pos] != 0 && buf[pos] != XPL_PACKETTRAILER) pos++;
-    end = pos;
-}
-
-
 int XPLPro::_parseString(char *outBuffer, char *inBuffer, int parameter, int maxSize)
 {
     // todo:  Confirm 0 length strings ("") dont cause issues
@@ -374,6 +371,22 @@ int XPLPro::_parseString(char *outBuffer, char *inBuffer, int parameter, int max
     // fprintf(errlog, "_parseString, pos: %i, cBeg: %i, deviceName: %s\n", pos, cBeg, target);
     return 0;
 }
+
+void XPLPro::_seekParm(const char* buf, int paramIdx, int& start, int &end)
+{
+    int pos = 0;
+    // search for the selected parameter
+    for (int i = 1; i < paramIdx; i++) {
+        while (buf[pos] != ',' && buf[pos] != 0) pos++;
+        if(buf[pos] != 0)pos++; // skip separator
+    }
+    // parameter starts here
+    start = pos;
+    // search for end of parameter
+    while (buf[pos] != ',' && buf[pos] != 0 && buf[pos] != XPL_PACKETTRAILER) pos++;
+    end = pos;
+}
+
 
 int XPLPro::_parseInt(int *outTarget, char *inBuffer, int parameter)
 {
@@ -493,4 +506,12 @@ void XPLPro::setScaling(int handle, int inLow, int inHigh, int outLow, int outHi
             outHigh,
             XPL_PACKETTRAILER);
     _transmitPacket();
+}
+// Re-creation of dtostrf for non-AVR boards
+char* Xdtostrf(double val, signed char width, unsigned char prec, char* sout) 
+{
+    char fmt[20];
+    sprintf(fmt, "%%%d.%df", width, prec);
+    sprintf(sout, fmt, val);
+    return sout;
 }
