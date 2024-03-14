@@ -142,6 +142,7 @@ void XPLPro::datarefWrite(int handle, float value)
         return;
     }
     char tBuf[20]; // todo:  rewrite to eliminate this buffer.  Write directly to _sendBuffer
+   
     Xdtostrf(value, 0, XPL_FLOATPRECISION, tBuf);
     sprintf(_sendBuffer, "%c%c,%i,%s%c",
             XPL_PACKETHEADER,
@@ -176,6 +177,17 @@ void XPLPro::_sendname()
     if (_deviceName != NULL)
     {
         _sendPacketString(XPLRESPONSE_NAME, _deviceName);
+    }
+}
+
+void XPLPro::_sendVersion()
+{
+    // register device on request only when we have a valid name
+    if (_deviceName != NULL)
+    {
+        char version[25];
+        sprintf(version, "%s %s", __DATE__, __TIME__);
+        _sendPacketString(XPLRESPONSE_VERSION, version);
     }
 }
 
@@ -241,9 +253,11 @@ void XPLPro::_processPacket()
 
     // register device
     case XPLCMD_SENDNAME:
+        _sendVersion();
         _sendname();
         _connectionStatus = true; // not considered active till you know my name
         _registerFlag = 0;
+        
         break;
 
     // plugin is ready for registrations.
@@ -305,7 +319,7 @@ void XPLPro::_processPacket()
         
         _xplInboundHandler(&_inData);
         break;
-        
+       
 
     // obsolete?            reserve for the time being...
   //  case XPLREQUEST_REFRESH:
@@ -345,82 +359,118 @@ void XPLPro::_transmitPacket(void)
     }
 }
 
-int XPLPro::_parseString(char *outBuffer, char *inBuffer, int parameter, int maxSize)
+int XPLPro::_parseString(char *outBuffer, char *inBuffer, int parameter, int maxSize)// todo:  Confirm 0 length strings ("") dont cause issues
 {
-    // todo:  Confirm 0 length strings ("") dont cause issues
     int cBeg;
     int pos = 0;
     int len;
 
-    for (int i = 1; i < parameter; i++) {
-        while (inBuffer[pos] != ',' && inBuffer[pos] != 0) pos++;
-        if(inBuffer[pos] != 0) pos++;
+    for (int i = 1; i < parameter; i++)
+    {
+        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
+        {
+            pos++;
+        }
+        pos++;
     }
 
-    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0) pos++;
-    if(inBuffer[pos] != 0) ++pos;
-    cBeg = pos;
+    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0)
+    {
+        pos++;
+    }
+    cBeg = ++pos;
 
-    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0) pos++;
-
+    while (inBuffer[pos] != '\"' && inBuffer[pos] != 0)
+    {
+        pos++;
+    }
     len = pos - cBeg;
-    if (len > maxSize) len = maxSize;
-
+    if (len > maxSize)
+    {
+        len = maxSize;
+    }
     strncpy(outBuffer, (char *)&inBuffer[cBeg], len);
     outBuffer[len] = 0;
     // fprintf(errlog, "_parseString, pos: %i, cBeg: %i, deviceName: %s\n", pos, cBeg, target);
     return 0;
 }
 
-void XPLPro::_seekParm(const char* buf, int paramIdx, int& start, int &end)
-{
-    int pos = 0;
-    // search for the selected parameter
-    for (int i = 1; i < paramIdx; i++) {
-        while (buf[pos] != ',' && buf[pos] != 0) pos++;
-        if(buf[pos] != 0)pos++; // skip separator
-    }
-    // parameter starts here
-    start = pos;
-    // search for end of parameter
-    while (buf[pos] != ',' && buf[pos] != 0 && buf[pos] != XPL_PACKETTRAILER) pos++;
-    end = pos;
-}
-
-
 int XPLPro::_parseInt(int *outTarget, char *inBuffer, int parameter)
 {
-    int cSt, cEnd;
-    _seekParm(inBuffer, parameter, cSt, cEnd);
+    int cBeg;
+    int pos = 0;
+    // search for the selected parameter
+    for (int i = 1; i < parameter; i++)
+    {
+        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
+        {
+            pos++;
+        }
+        pos++;
+    }
+    // parameter starts here
+    cBeg = pos;
+    // search for end of parameter
+    while (inBuffer[pos] != ',' && inBuffer[pos] != 0 && inBuffer[pos] != XPL_PACKETTRAILER)
+    {
+        pos++;
+    }
     // temporarily make parameter null terminated
-    char holdChar = inBuffer[cEnd];
-    inBuffer[cEnd] = 0;
+    char holdChar = inBuffer[pos];
+    inBuffer[pos] = 0;
     // get integer value from string
-    *outTarget = atoi((char *)&inBuffer[cSt]);
+    *outTarget = atoi((char *)&inBuffer[cBeg]);
     // restore buffer
-    inBuffer[cEnd] = holdChar;
+    inBuffer[pos] = holdChar;
     return 0;
 }
 
 int XPLPro::_parseInt(long *outTarget, char *inBuffer, int parameter)
 {
-    int cSt, cEnd;
-    _seekParm(inBuffer, parameter, cSt, cEnd);
-    char holdChar = inBuffer[cEnd];
-    inBuffer[cEnd] = 0;
-    *outTarget = atol((char *)&inBuffer[cSt]);
-    inBuffer[cEnd] = holdChar;
+    int cBeg;
+    int pos = 0;
+    for (int i = 1; i < parameter; i++)
+    {
+        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
+        {
+            pos++;
+        }
+        pos++;
+    }
+    cBeg = pos;
+    while (inBuffer[pos] != ',' && inBuffer[pos] != 0 && inBuffer[pos] != XPL_PACKETTRAILER)
+    {
+        pos++;
+    }
+    char holdChar = inBuffer[pos];
+    inBuffer[pos] = 0;
+    *outTarget = atol((char *)&inBuffer[cBeg]);
+    inBuffer[pos] = holdChar;
     return 0;
 }
 
 int XPLPro::_parseFloat(float *outTarget, char *inBuffer, int parameter)
 {
-    int cSt, cEnd;
-    _seekParm(inBuffer, parameter, cSt, cEnd);
-    char holdChar = inBuffer[cEnd];
-    inBuffer[cEnd] = 0;
-    *outTarget = atof((char *)&inBuffer[cSt]);
-    inBuffer[cEnd] = holdChar;
+    int cBeg;
+    int pos = 0;
+    for (int i = 1; i < parameter; i++)
+    {
+        while (inBuffer[pos] != ',' && inBuffer[pos] != 0)
+        {
+            pos++;
+        }
+        pos++;
+    }
+    cBeg = pos;
+    while (inBuffer[pos] != ',' && inBuffer[pos] != 0 && inBuffer[pos] != XPL_PACKETTRAILER)
+    {
+        pos++;
+    }
+    char holdChar = inBuffer[pos];
+    inBuffer[pos] = 0;
+    *outTarget = atof((char *)&inBuffer[cBeg]);
+    inBuffer[pos] = holdChar;
+    return 0;
 }
 
 int XPLPro::registerDataRef(XPString_t *datarefName)
@@ -508,10 +558,16 @@ void XPLPro::setScaling(int handle, int inLow, int inHigh, int outLow, int outHi
     _transmitPacket();
 }
 // Re-creation of dtostrf for non-AVR boards
-char* Xdtostrf(double val, signed char width, unsigned char prec, char* sout) 
+char *XPLPro::Xdtostrf(double val, signed char width, unsigned char prec, char* sout) 
 {
+#ifdef __AVR_ARCH__
+    return dtostrf(val, width, prec, sout);
+#else
     char fmt[20];
     sprintf(fmt, "%%%d.%df", width, prec);
     sprintf(sout, fmt, val);
     return sout;
+#endif
+
 }
+

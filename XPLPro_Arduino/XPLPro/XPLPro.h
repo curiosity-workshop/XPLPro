@@ -77,6 +77,7 @@ typedef const char XPString_t;
 // Items in caps generally come from XPlane. Items in lower case are generally sent from the arduino.
 #define XPLCMD_SENDNAME 'N'                // plugin request name from arduino
 #define XPLRESPONSE_NAME 'n'               // Arduino responds with device name as initialized in the "begin" function
+#define XPLRESPONSE_VERSION 'v'             // Arduino responds with build date and time (when sketch was compiled)
 #define XPLCMD_SENDREQUEST 'Q'             // plugin sends this when it is ready to register bindings
 #define XPLCMD_FLIGHTLOOPPAUSE	    'p'		// stop flight loop while we register
 #define XPLCMD_FLIGHTLOOPRESUME  	'q'		// 
@@ -241,9 +242,9 @@ private:
     void _processPacket();
     void _transmitPacket();
     void _sendname();
+    void _sendVersion();
     void _sendPacketVoid(int command, int handle);        // just a command with a handle
     void _sendPacketString(int command, const char *str); // send a string
-    void _seekParm(char* buf, int paramIdx, int& start, int &end);
     int _parseInt(int *outTarget, char *inBuffer, int parameter);
     int _parseInt(long *outTarget, char *inBuffer, int parameter);
     int _parseFloat(float *outTarget, char *inBuffer, int parameter);
